@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Alert, ScrollView, PanResponder, Dimensions, LayoutChangeEvent, Animated, TextInput, Modal } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Alert, ScrollView, PanResponder, Dimensions, LayoutChangeEvent, Animated, TextInput, Modal, Platform } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import * as Linking from 'expo-linking';
@@ -220,6 +220,50 @@ export default function App() {
     };
 
     const connectWallet = async () => {
+        if (Platform.OS === 'web') {
+            try {
+                // @ts-ignore
+                const solflare = window.solflare;
+                // @ts-ignore
+                const solana = window.solana;
+
+                let provider = null;
+                if (solflare && solflare.isSolflare) {
+                    provider = solflare;
+                } else if (solana && solana.isPhantom) {
+                    provider = solana;
+                }
+
+                if (!provider) {
+                    alert('Please install Solflare or Phantom wallet extension!');
+                    return;
+                }
+
+                await provider.connect();
+                const publicKey = provider.publicKey;
+                const address = publicKey.toString();
+
+                setUsername(address);
+
+                try {
+                    const connection = new Connection(clusterApiUrl('devnet'), 'confirmed');
+                    const bal = await connection.getBalance(publicKey);
+                    setBalance(bal / LAMPORTS_PER_SOL);
+                } catch (e) {
+                    console.error("Failed to fetch balance on web", e);
+                }
+
+                setTimeout(() => {
+                    setGameState('LOBBY');
+                    fetchLeaderboard();
+                }, 500);
+            } catch (err) {
+                console.error("Web Login Error", err);
+                Alert.alert("Login Failed", "Could not connect to wallet extension.");
+            }
+            return;
+        }
+
         try {
             await transact(async (wallet: Web3MobileWallet) => {
                 const { accounts, auth_token } = await wallet.authorize({
