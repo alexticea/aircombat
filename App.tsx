@@ -267,6 +267,9 @@ export default function App() {
         }
 
         try {
+            let connectedAddress = '';
+            let connectedPublicKey: PublicKey | null = null;
+
             await transact(async (wallet: Web3MobileWallet) => {
                 const { accounts, auth_token } = await wallet.authorize({
                     cluster: 'devnet',
@@ -274,25 +277,27 @@ export default function App() {
                 });
 
                 const firstAccount = accounts[0];
-                const publicKey = new PublicKey(firstAccount.address);
-                const address = publicKey.toBase58();
+                connectedPublicKey = new PublicKey(firstAccount.address);
+                connectedAddress = connectedPublicKey.toBase58();
 
                 // Sign a message for verification (optional but good practice)
                 const message = 'Log in to AirCombat';
                 const messageBuffer = Buffer.from(message);
 
-                const signedMessages = await wallet.signMessages({
-                    addresses: [address],
+                await wallet.signMessages({
+                    addresses: [connectedAddress],
                     payloads: [messageBuffer.toString('base64')],
                 });
+            });
 
-                // If successful
-                setUsername(address);
-                setWalletAddress(address);
+            // If successful (and assigned vars), update state here
+            if (connectedAddress && connectedPublicKey) {
+                setUsername(connectedAddress);
+                setWalletAddress(connectedAddress);
 
                 try {
                     const connection = new Connection(clusterApiUrl('devnet'), 'confirmed');
-                    const bal = await connection.getBalance(publicKey);
+                    const bal = await connection.getBalance(connectedPublicKey as PublicKey);
                     setBalance(bal / LAMPORTS_PER_SOL);
                 } catch (e) {
                     console.error("Failed to fetch balance", e);
@@ -302,7 +307,8 @@ export default function App() {
                     setGameState('LOBBY');
                     fetchLeaderboard();
                 }, 500);
-            });
+            }
+
         } catch (err: any) {
             console.log('Mobile Wallet Adapter Error:', err);
             // Fallback for simple deeplinking if MWA fails or not supported
