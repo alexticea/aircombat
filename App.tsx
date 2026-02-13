@@ -222,7 +222,7 @@ export default function App() {
         try {
             await transact(async (wallet: Web3MobileWallet) => {
                 const { accounts, auth_token } = await wallet.authorize({
-                    cluster: 'devnet',
+                    cluster: 'mainnet-beta',
                     identity: APP_IDENTITY,
                 });
 
