@@ -70,12 +70,12 @@ export default function App() {
         }
     };
 
-    const submitScore = async (name: string, wins: number, kills: number) => {
+    const submitScore = async (name: string, wins: number, kills: number, walletAddress?: string | null) => {
         try {
             await fetch(`${API_URL}/update-score`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ username: name, wins, kills })
+                body: JSON.stringify({ username: name, wins, kills, walletAddress })
             });
             fetchLeaderboard();
         } catch (err) {
@@ -926,11 +926,12 @@ export default function App() {
                                     onPress={() => {
                                         const newName = tempName || username;
                                         setUsername(newName);
-                                        submitScore(newName, playerWins, totalPlanesDestroyed);
+                                        // @ts-ignore
+                                        submitScore(newName, playerWins, totalPlanesDestroyed, walletAddress);
                                         setIsEditingName(false);
                                     }}
                                 >
-                                    <Text style={styles.smallButtonText}>SAVE</Text>
+                                    <Text style={styles.smallButtonText}>CONFIRM</Text>
                                 </TouchableOpacity>
                             </View>
                         </View>
@@ -991,7 +992,7 @@ export default function App() {
                     </View>
                 </Modal>
             </SafeAreaView>
-        </SafeAreaProvider>
+        </SafeAreaProvider >
     );
 }
 

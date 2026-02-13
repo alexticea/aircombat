@@ -15,7 +15,8 @@ mongoose.connect(MONGO_URI)
     .catch(err => console.error('MongoDB connection error:', err));
 
 const PilotSchema = new mongoose.Schema({
-    username: { type: String, required: true, unique: true },
+    username: { type: String, required: true },
+    walletAddress: { type: String, unique: true, sparse: true },
     wins: { type: Number, default: 0 },
     kills: { type: Number, default: 0 },
     updatedAt: { type: Date, default: Date.now }
@@ -37,17 +38,41 @@ app.get('/leaderboard', async (req, res) => {
 
 // POST Update Score
 app.post('/update-score', async (req, res) => {
-    const { username, wins, kills } = req.body;
+    const { username, wins, kills, walletAddress } = req.body;
+
     try {
-        const pilot = await Pilot.findOneAndUpdate(
-            { username },
-            {
-                $set: { wins, kills, updatedAt: new Date() }
-            },
-            { upsert: true, new: true }
-        );
+        let pilot;
+
+        if (walletAddress) {
+            // If wallet is connected, find by walletAddress
+            pilot = await Pilot.findOne({ walletAddress });
+
+            if (pilot) {
+                // Update existing wallet user (rename and update stats)
+                pilot.username = username;
+                pilot.wins = wins;
+                pilot.kills = kills;
+                pilot.updatedAt = new Date();
+                await pilot.save();
+            } else {
+                // Create new wallet user
+                pilot = new Pilot({ username, walletAddress, wins, kills });
+                await pilot.save();
+            }
+        } else {
+            // Guest mode: find/create by username
+            pilot = await Pilot.findOneAndUpdate(
+                { username },
+                {
+                    $set: { wins, kills, updatedAt: new Date() }
+                },
+                { upsert: true, new: true }
+            );
+        }
+
         res.json(pilot);
     } catch (err) {
+        console.error(err);
         res.status(500).json({ error: 'Failed to update score' });
     }
 });
