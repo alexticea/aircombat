@@ -41,7 +41,7 @@ export default function App() {
 
     // For local testing: 'http://localhost:5000' or your local IP
     // For cloud: Replace with your Render/deployment URL
-    const API_URL = 'http://localhost:5000';
+    const API_URL = 'https://aircombat.onrender.com/';
 
     const fetchLeaderboard = async () => {
         try {
