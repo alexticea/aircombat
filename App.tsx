@@ -8,8 +8,16 @@ import { PlaneVisual } from './components/PlaneVisual';
 import * as Game from './GameLogic';
 import { Coordinate, GridCell, Plane } from './GameLogic';
 
+import { transact, Web3MobileWallet } from '@solana-mobile/mobile-wallet-adapter-protocol-web3js';
+import { PublicKey } from '@solana/web3.js';
+
 // Simple Linear Gradient BG placeholder (or use dark solid color)
 const BG_COLOR = '#050510';
+const APP_IDENTITY = {
+    name: 'AirCombat',
+    uri: 'https://aircombat.onrender.com/',
+    icon: 'favicon.ico', // relative path to app icon if any
+};
 
 export default function App() {
     const [gameState, setGameState] = useState<'LOGIN' | 'LOBBY' | 'SETUP' | 'PLAY' | 'GAME_OVER'>('LOGIN');
@@ -201,25 +209,51 @@ export default function App() {
     const handleLogin = async () => {
         console.log('Login button pressed');
         try {
-            const supported = await Linking.canOpenURL('solflare://');
-            console.log('Solflare supported:', supported);
-            if (supported) {
-                Linking.openURL('solflare://');
-                setTimeout(() => {
-                    setGameState('LOBBY');
-                    fetchLeaderboard();
-                }, 2000);
-            } else {
-                Alert.alert('Solflare not found', 'Proceeding as Guest player...');
-                setTimeout(() => {
-                    setGameState('LOBBY');
-                    fetchLeaderboard();
-                }, 1000);
-            }
+            await connectWallet();
         } catch (e) {
-            console.error('Linking error:', e);
+            console.error('Wallet connection error:', e);
+            Alert.alert('Wallet Error', 'Failed to connect wallet. Using Guest mode.');
             setGameState('LOBBY');
             fetchLeaderboard();
+        }
+    };
+
+    const connectWallet = async () => {
+        try {
+            await transact(async (wallet: Web3MobileWallet) => {
+                const { accounts, auth_token } = await wallet.authorize({
+                    cluster: 'devnet',
+                    identity: APP_IDENTITY,
+                });
+
+                const firstAccount = accounts[0];
+                const publicKey = new PublicKey(firstAccount.address);
+                const address = publicKey.toBase58();
+
+                // Sign a message for verification (optional but good practice)
+                const message = 'Log in to AirCombat';
+                const messageBuffer = new Uint8Array(Buffer.from(message));
+
+                const signedMessages = await wallet.signMessages({
+                    addresses: [address],
+                    payloads: [messageBuffer],
+                });
+
+                // If successful
+                setUsername(address.slice(0, 4) + '...' + address.slice(-4));
+                setTimeout(() => {
+                    setGameState('LOBBY');
+                    fetchLeaderboard();
+                }, 500);
+            });
+        } catch (err: any) {
+            console.log('Mobile Wallet Adapter Error:', err);
+            // Fallback for simple deeplinking if MWA fails or not supported
+            if (err.message && err.message.includes('No wallet found')) {
+                Linking.openURL('https://solflare.com/ul/v1/connect');
+            } else {
+                throw err;
+            }
         }
     };
 
