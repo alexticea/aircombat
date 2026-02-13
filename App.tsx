@@ -39,6 +39,7 @@ export default function App() {
 
     // User Profile & Leaderboard
     const [username, setUsername] = useState('Pilot_' + Math.floor(1000 + Math.random() * 9000));
+    const [walletAddress, setWalletAddress] = useState<string | null>(null);
     const [playerWins, setPlayerWins] = useState(0);
     const [totalPlanesDestroyed, setTotalPlanesDestroyed] = useState(0);
     const [showLeaderboard, setShowLeaderboard] = useState(false);
@@ -244,6 +245,7 @@ export default function App() {
                 const address = publicKey.toString();
 
                 setUsername(address);
+                setWalletAddress(address);
 
                 try {
                     const connection = new Connection(clusterApiUrl('devnet'), 'confirmed');
@@ -286,6 +288,7 @@ export default function App() {
 
                 // If successful
                 setUsername(address);
+                setWalletAddress(address);
 
                 try {
                     const connection = new Connection(clusterApiUrl('devnet'), 'confirmed');
@@ -895,14 +898,22 @@ export default function App() {
                         <View style={styles.modalContent}>
                             <Text style={styles.modalTitle}>IDENTIFICATION</Text>
                             <TextInput
-                                style={styles.nameInput}
+                                style={styles.input}
                                 value={tempName}
                                 onChangeText={setTempName}
                                 placeholder="ENTER CALLSIGN"
                                 placeholderTextColor="#555"
                                 autoFocus
-                                maxLength={15}
+                                maxLength={45}
                             />
+                            {walletAddress && (
+                                <TouchableOpacity
+                                    style={[styles.modalButton, { backgroundColor: '#333', marginBottom: 10, borderWidth: 1, borderColor: '#555' }]}
+                                    onPress={() => setTempName(walletAddress)}
+                                >
+                                    <Text style={styles.buttonText}>USE WALLET ADDRESS</Text>
+                                </TouchableOpacity>
+                            )}
                             <View style={styles.modalButtons}>
                                 <TouchableOpacity
                                     style={[styles.smallButton, { backgroundColor: '#333' }]}
@@ -1451,6 +1462,26 @@ const styles = StyleSheet.create({
         fontSize: 10,
         fontWeight: 'bold',
         letterSpacing: 1,
+    },
+    input: {
+        backgroundColor: '#2D3436',
+        color: '#FFF',
+        padding: 15,
+        borderRadius: 10,
+        width: '100%',
+        marginBottom: 20,
+        textAlign: 'center',
+        borderWidth: 1,
+        borderColor: '#555',
+        fontSize: 16,
+    },
+    modalButton: {
+        backgroundColor: '#6C5CE7',
+        paddingVertical: 12,
+        paddingHorizontal: 30,
+        borderRadius: 25,
+        minWidth: 120,
+        alignItems: 'center',
     }
 });
 
