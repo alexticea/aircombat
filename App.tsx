@@ -267,37 +267,36 @@ export default function App() {
         }
 
         try {
-            let connectedAddress = '';
-            let connectedPublicKey: PublicKey | null = null;
-
-            await transact(async (wallet: Web3MobileWallet) => {
+            const { address, publicKey } = await transact(async (wallet: Web3MobileWallet) => {
                 const { accounts, auth_token } = await wallet.authorize({
                     cluster: 'devnet',
                     identity: APP_IDENTITY,
                 });
 
                 const firstAccount = accounts[0];
-                connectedPublicKey = new PublicKey(firstAccount.address);
-                connectedAddress = connectedPublicKey.toBase58();
+                const key = new PublicKey(firstAccount.address);
+                const addr = key.toBase58();
 
                 // Sign a message for verification (optional but good practice)
                 const message = 'Log in to AirCombat';
                 const messageBuffer = Buffer.from(message);
 
                 await wallet.signMessages({
-                    addresses: [connectedAddress],
+                    addresses: [addr],
                     payloads: [messageBuffer.toString('base64')],
                 });
+
+                return { address: addr, publicKey: key };
             });
 
-            // If successful (and assigned vars), update state here
-            if (connectedAddress && connectedPublicKey) {
-                setUsername(connectedAddress);
-                setWalletAddress(connectedAddress);
+            // If successful (and returned vars), update state here
+            if (address && publicKey) {
+                setUsername(address);
+                setWalletAddress(address);
 
                 try {
                     const connection = new Connection(clusterApiUrl('devnet'), 'confirmed');
-                    const bal = await connection.getBalance(connectedPublicKey as PublicKey);
+                    const bal = await connection.getBalance(publicKey);
                     setBalance(bal / LAMPORTS_PER_SOL);
                 } catch (e) {
                     console.error("Failed to fetch balance", e);
