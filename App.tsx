@@ -519,7 +519,7 @@ export default function App() {
                         <View style={styles.profileBadgeSmall}>
                             <View style={styles.avatarSmall} />
                             <View>
-                                <Text style={styles.profileNameSmall}>{username.slice(0, 4)}...{username.slice(-4)}</Text>
+                                <Text style={styles.profileNameSmall}>{username.length > 20 ? `${username.slice(0, 4)}...${username.slice(-4)}` : username}</Text>
                                 {balance !== null && <Text style={styles.balanceText}>{balance.toFixed(2)} SOL</Text>}
                             </View>
                         </View>
