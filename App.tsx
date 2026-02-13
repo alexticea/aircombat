@@ -240,7 +240,7 @@ export default function App() {
                 });
 
                 // If successful
-                setUsername(address.slice(0, 4) + '...' + address.slice(-4));
+                setUsername(address);
                 setTimeout(() => {
                     setGameState('LOBBY');
                     fetchLeaderboard();
