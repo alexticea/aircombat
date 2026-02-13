@@ -4,8 +4,6 @@
   "include": [
     "**/*.ts",
     "**/*.tsx",
-    ".expo/types/**/*.ts",
-    "expo-env.d.ts",
     "solana-mobile.d.ts"
   ]
 }
