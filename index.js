@@ -1,7 +1,11 @@
+import { install } from 'react-native-quick-crypto';
+install(); // Install quick-crypto before other polyfills
+
 import 'react-native-get-random-values';
-import { Buffer } from 'buffer';
+import { Buffer } from '@craftzdog/react-native-buffer';
 global.Buffer = Buffer;
 global.TextEncoder = require('text-encoding').TextEncoder;
+global.process = require('process');
 
 import { registerRootComponent } from 'expo';
 
