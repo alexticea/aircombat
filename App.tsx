@@ -9,7 +9,7 @@ import * as Game from './GameLogic';
 import { Coordinate, GridCell, Plane } from './GameLogic';
 
 import { transact, Web3MobileWallet } from '@solana-mobile/mobile-wallet-adapter-protocol-web3js';
-import { PublicKey } from '@solana/web3.js';
+import { PublicKey, Connection, clusterApiUrl, LAMPORTS_PER_SOL } from '@solana/web3.js';
 
 // Simple Linear Gradient BG placeholder (or use dark solid color)
 const BG_COLOR = '#050510';
@@ -46,6 +46,7 @@ export default function App() {
     const [tempName, setTempName] = useState('');
     const [showRecap, setShowRecap] = useState(false);
     const [leaderboard, setLeaderboard] = useState<{ username: string, wins: number, kills: number }[]>([]);
+    const [balance, setBalance] = useState<number | null>(null);
 
     // For local testing: 'http://localhost:5000' or your local IP
     // For cloud: Replace with your Render/deployment URL
@@ -241,6 +242,15 @@ export default function App() {
 
                 // If successful
                 setUsername(address);
+
+                try {
+                    const connection = new Connection(clusterApiUrl('devnet'), 'confirmed');
+                    const bal = await connection.getBalance(publicKey);
+                    setBalance(bal / LAMPORTS_PER_SOL);
+                } catch (e) {
+                    console.error("Failed to fetch balance", e);
+                }
+
                 setTimeout(() => {
                     setGameState('LOBBY');
                     fetchLeaderboard();
@@ -495,7 +505,6 @@ export default function App() {
                     setTurn('PLAYER');
                 }, 1000);
             }
-        } else {
             setTurn('PLAYER');
         }
     };
@@ -504,6 +513,18 @@ export default function App() {
         <SafeAreaProvider>
             <SafeAreaView style={styles.container}>
                 <StatusBar style="light" />
+
+                {gameState !== 'LOGIN' && (
+                    <View style={styles.topBar}>
+                        <View style={styles.profileBadgeSmall}>
+                            <View style={styles.avatarSmall} />
+                            <View>
+                                <Text style={styles.profileNameSmall}>{username.slice(0, 4)}...{username.slice(-4)}</Text>
+                                {balance !== null && <Text style={styles.balanceText}>{balance.toFixed(2)} SOL</Text>}
+                            </View>
+                        </View>
+                    </View>
+                )}
 
                 {gameState === 'LOGIN' && (
                     <View style={styles.center}>
@@ -1350,6 +1371,42 @@ const styles = StyleSheet.create({
         color: '#fff',
         fontSize: 10,
         fontWeight: '900',
+    },
+    topBar: {
+        position: 'absolute',
+        top: 20,
+        left: 20,
+        zIndex: 100,
+    },
+    profileBadgeSmall: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: 'rgba(20, 20, 35, 0.9)',
+        padding: 8,
+        borderRadius: 20,
+        borderWidth: 1,
+        borderColor: '#6C5CE7',
+    },
+    avatarSmall: {
+        width: 32,
+        height: 32,
+        borderRadius: 16,
+        backgroundColor: '#6C5CE7',
+        marginRight: 10,
+        borderWidth: 1,
+        borderColor: '#fff',
+    },
+    profileNameSmall: {
+        color: '#fff',
+        fontWeight: 'bold',
+        fontSize: 12,
+        marginBottom: 2,
+    },
+    balanceText: {
+        color: '#00ffaa',
+        fontSize: 10,
+        fontWeight: 'bold',
+        letterSpacing: 1,
     }
 });
 
