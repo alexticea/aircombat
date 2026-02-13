@@ -525,7 +525,13 @@ export default function App() {
                     <View style={styles.center}>
                         <View style={styles.profileBadge}>
                             <Text style={styles.pilotRank}>ADMIRAL</Text>
-                            <Text style={styles.pilotName}>{username}</Text>
+                            <Text
+                                style={[styles.pilotName, { fontSize: username.length > 20 ? 16 : 24 }]}
+                                numberOfLines={1}
+                                adjustsFontSizeToFit
+                            >
+                                {username}
+                            </Text>
 
                             <View style={styles.badgeLine} />
 
