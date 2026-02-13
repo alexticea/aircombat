@@ -593,12 +593,8 @@ export default function App() {
                     <View style={styles.center}>
                         <View style={styles.profileBadge}>
                             <Text style={styles.pilotRank}>ADMIRAL</Text>
-                            <Text
-                                style={[styles.pilotName, { fontSize: username.length > 20 ? 16 : 24 }]}
-                                numberOfLines={1}
-                                adjustsFontSizeToFit
-                            >
-                                {username}
+                            <Text style={styles.pilotName}>
+                                {username.length > 20 ? `${username.slice(0, 4)}...${username.slice(-4)}` : username}
                             </Text>
 
                             <View style={styles.badgeLine} />
@@ -952,7 +948,9 @@ export default function App() {
                                                     i === 2 ? <Text style={styles.medal}>🥉</Text> :
                                                         <Text style={styles.leaderRank}>#{i + 1}</Text>}
                                         </View>
-                                        <Text style={[styles.leaderName, ace.username === username && { color: '#6C5CE7' }]}>{ace.username}</Text>
+                                        <Text style={[styles.leaderName, ace.username === username && { color: '#6C5CE7' }]}>
+                                            {ace.username.length > 20 ? `${ace.username.slice(0, 4)}...${ace.username.slice(-4)}` : ace.username}
+                                        </Text>
                                         <View style={styles.leaderStats}>
                                             <View style={styles.statBox}>
                                                 <Text style={styles.statValueMini}>{ace.wins}</Text>
