@@ -1,29 +1,37 @@
 {
   "expo": {
-    "name": "planes",
-    "slug": "planes",
+    "name": "AirCombat",
+    "slug": "air-combat",
     "version": "1.0.0",
+    "scheme": "air-combat",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "userInterfaceStyle": "light",
+    "userInterfaceStyle": "dark",
     "newArchEnabled": true,
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "backgroundColor": "#050510"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.alex.aircombat"
     },
     "android": {
+      "package": "com.alex.aircombat",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
+        "backgroundColor": "#050510"
       },
       "edgeToEdgeEnabled": true
     },
     "web": {
       "favicon": "./assets/favicon.png"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "cd72e2e1-ce09-47ee-9cba-bd9555d48797"
+      }
     }
   }
 }
