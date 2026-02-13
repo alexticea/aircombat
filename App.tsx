@@ -232,11 +232,11 @@ export default function App() {
 
                 // Sign a message for verification (optional but good practice)
                 const message = 'Log in to AirCombat';
-                const messageBuffer = new Uint8Array(Buffer.from(message));
+                const messageBuffer = Buffer.from(message);
 
                 const signedMessages = await wallet.signMessages({
                     addresses: [address],
-                    payloads: [messageBuffer],
+                    payloads: [messageBuffer.toString('base64')],
                 });
 
                 // If successful
