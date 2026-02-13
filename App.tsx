@@ -41,15 +41,22 @@ export default function App() {
 
     // For local testing: 'http://localhost:5000' or your local IP
     // For cloud: Replace with your Render/deployment URL
-    const API_URL = 'https://aircombat.onrender.com/';
+    const RAW_API_URL = 'https://aircombat.onrender.com/';
+    const API_URL = RAW_API_URL.endsWith('/') ? RAW_API_URL.slice(0, -1) : RAW_API_URL;
+    const [serverStatus, setServerStatus] = useState<'IDLE' | 'LOADING' | 'SUCCESS' | 'ERROR'>('IDLE');
 
     const fetchLeaderboard = async () => {
+        setServerStatus('LOADING');
         try {
+            console.log(`[NET] Fetching from: ${API_URL}/leaderboard`);
             const response = await fetch(`${API_URL}/leaderboard`);
+            if (!response.ok) throw new Error('Server unreachable');
             const data = await response.json();
             setLeaderboard(data);
+            setServerStatus('SUCCESS');
         } catch (err) {
             console.error('Leaderboard fetch error:', err);
+            setServerStatus('ERROR');
         }
     };
 
@@ -349,14 +356,17 @@ export default function App() {
         // Check Win using the newly updated planes
         const allComputerDestroyed = planesClone.every(p => p.isDestroyed);
         if (allComputerDestroyed) {
+            setTotalPlanesDestroyed(currentKills => {
+                const finalKills = currentKills + 1;
+                setPlayerWins(currentWins => {
+                    const finalWins = currentWins + 1;
+                    submitScore(username, finalWins, finalKills);
+                    return finalWins;
+                });
+                return finalKills;
+            });
             setWinner('PLAYER');
             setPlayerScore(3);
-            setPlayerWins(prev => {
-                const nextWins = prev + 1;
-                submitScore(username, nextWins, totalPlanesDestroyed + 1);
-                return nextWins;
-            });
-            setTotalPlanesDestroyed(prev => prev + 1);
             setBattleMsg('VICTORY!');
             setTimeout(() => {
                 setGameState('GAME_OVER');
@@ -839,7 +849,20 @@ export default function App() {
                                     </View>
                                 ))}
                                 {leaderboard.length === 0 && (
-                                    <Text style={{ color: '#555', textAlign: 'center', marginTop: 30 }}>NO DATA RECORDED</Text>
+                                    <View style={{ marginTop: 40, alignItems: 'center' }}>
+                                        <Text style={{ color: '#555', textAlign: 'center' }}>
+                                            {serverStatus === 'LOADING' ? 'CONNECTING TO BASE...' :
+                                                serverStatus === 'ERROR' ? 'COMMUNICATION ERROR' : 'NO DATA RECORDED'}
+                                        </Text>
+                                        {(serverStatus === 'ERROR' || serverStatus === 'IDLE') && (
+                                            <TouchableOpacity
+                                                style={[styles.smallButton, { marginTop: 20, borderColor: '#6C5CE7' }]}
+                                                onPress={fetchLeaderboard}
+                                            >
+                                                <Text style={styles.smallButtonText}>RETRY CONNECTION</Text>
+                                            </TouchableOpacity>
+                                        )}
+                                    </View>
                                 )}
                             </ScrollView>
                             <TouchableOpacity
