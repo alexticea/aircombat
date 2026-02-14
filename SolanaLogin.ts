@@ -16,11 +16,16 @@ export interface PhantomSession {
 // For simplicity in this example, we re-generate keys on app restart or keep in global state
 let sessionState: PhantomSession | null = null;
 
-// Generate a new DApp Keypair on init
 export const initSession = (): PhantomSession => {
     const keyPair = nacl.box.keyPair();
     sessionState = { dappKeyPair: keyPair };
+    console.log("[SolanaLogin] Session initialized with new keypair");
     return sessionState;
+};
+
+export const clearSession = () => {
+    sessionState = null;
+    console.log("[SolanaLogin] Session cleared");
 };
 
 // Helper to encrypt payload
@@ -43,7 +48,8 @@ const decryptPayload = (data: string, nonce: string, sharedSecret: Uint8Array) =
 
 
 export const buildConnectUrl = (redirectLink: string) => {
-    if (!sessionState) initSession();
+    // Always start fresh on a new connect attempt to avoid state confusion
+    initSession();
     const { dappKeyPair } = sessionState!;
 
     const params = new URLSearchParams({
@@ -60,14 +66,16 @@ export const handleConnectCallback = (url: string): { publicKey: PublicKey, sess
     if (!sessionState) return null;
 
     const parsed = Linking.parse(url);
+    // Explicitly check path to avoid cross-fire with signMessage callback
+    if (parsed.path !== 'solflare-login') return null;
+
     const queryParams = parsed.queryParams;
-    console.log("[SolanaLogin] Deep Link URL:", url);
-    console.log("[SolanaLogin] Query Params:", JSON.stringify(queryParams));
+    console.log("[SolanaLogin] Connect Callback:", url);
 
     if (!queryParams) return null;
 
     if (queryParams.errorCode) {
-        console.error("[SolanaLogin] Error:", queryParams.errorMessage);
+        console.error("[SolanaLogin] Connection Error:", queryParams.errorMessage);
         return null;
     }
 
@@ -134,9 +142,15 @@ export const handleSignMessageCallback = (url: string): { signature: string } | 
     if (!sessionState || !sessionState.sharedSecret) return null;
 
     const parsed = Linking.parse(url);
-    const queryParams = parsed.queryParams;
+    if (parsed.path !== 'solflare-sign') return null;
 
-    if (!queryParams || queryParams.errorCode) return null;
+    const queryParams = parsed.queryParams;
+    console.log("[SolanaLogin] SignMessage Callback:", url);
+
+    if (!queryParams || queryParams.errorCode) {
+        if (queryParams?.errorCode) console.error("[SolanaLogin] Sign Error:", queryParams.errorMessage);
+        return null;
+    }
 
     const dataStr = queryParams.data as string;
     const nonceStr = queryParams.nonce as string;

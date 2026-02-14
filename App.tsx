@@ -493,6 +493,7 @@ export default function App() {
         setWalletAddress(null);
         setBalance(null);
         setGameState('LOGIN');
+        SolanaLogin.clearSession();
         // If web, disconnect from provider
         if (Platform.OS === 'web') {
             try {
