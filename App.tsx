@@ -161,6 +161,12 @@ export default function App() {
     const playerWinsRef = useRef(playerWins);
     useEffect(() => { playerWinsRef.current = playerWins; }, [playerWins]);
 
+    const totalPlanesDestroyedRef = useRef(totalPlanesDestroyed);
+    useEffect(() => { totalPlanesDestroyedRef.current = totalPlanesDestroyed; }, [totalPlanesDestroyed]);
+
+    const playerPlanesRef = useRef(playerPlanes);
+    useEffect(() => { playerPlanesRef.current = playerPlanes; }, [playerPlanes]);
+
     // Create a stable listener for incoming fire that uses the ref
     useEffect(() => {
         if (!socket) return;
@@ -171,80 +177,113 @@ export default function App() {
             let result = 'MISS';
             let isKill = false;
 
-            // Check if already hit?
-            if (cell.state !== 'EMPTY') {
-                // Already processed, but maybe send back previous result?
-                // For now, ignore or re-send
-                return;
-            }
+            if (cell.state !== 'EMPTY') return;
 
-            // Update Grid Visual
             const newGrid = grid.map(row => row.map(c => ({ ...c })));
             const target = newGrid[coord.y][coord.x];
 
             if (target.planeId !== undefined) {
-                target.state = 'HIT'; // Default HIT
-                result = 'HIT';
+                const hitPlane = playerPlanesRef.current.find(p => p.id === target.planeId);
+                const isHead = hitPlane && hitPlane.head.x === coord.x && hitPlane.head.y === coord.y;
 
-                // Check if Kill (check if all parts of this plane are hit)
-                // This is slightly complex without full Plane objects map
-                // But we can check grid cells with same planeId
-                const planeParts = newGrid.flat().filter(c => c.planeId === target.planeId);
-                const allHit = planeParts.every(c => c.state === 'HIT' || c.state === 'DEAD_HEAD' || c.state === 'DEAD_BODY');
-
-                if (allHit) {
-                    result = 'KILL'; // Protocol expects HIT/MISS/KILL? server code sends result back
+                if (isHead) {
+                    target.state = 'DEAD_HEAD';
+                    result = 'KILL';
                     isKill = true;
-                    // Mark as dead visually?
-                    planeParts.forEach(p => p.state = 'DEAD_BODY'); // Simplified visual
+                    newGrid.flat().forEach(c => {
+                        if (c.planeId === target.planeId && c.state === 'HIT') {
+                            c.state = 'DEAD_BODY';
+                        }
+                    });
+                } else {
+                    target.state = 'HIT';
+                    result = 'HIT';
+                    const planeParts = newGrid.flat().filter(c => c.planeId === target.planeId);
+                    const allHit = planeParts.every(c => c.state === 'HIT' || c.state === 'DEAD_HEAD' || c.state === 'DEAD_BODY');
+                    if (allHit) {
+                        result = 'KILL';
+                        isKill = true;
+                        planeParts.forEach(p => { if (p.state === 'HIT') p.state = 'DEAD_BODY'; });
+                    }
                 }
             } else {
                 target.state = 'MISS';
             }
+
             setPlayerGrid(newGrid);
 
-            // Send Result
             socket.emit('shot_result', {
                 roomId,
                 Coordinate: coord,
-                result: result === 'KILL' ? 'HIT' : result, // Protocol expects HIT/MISS usually, but let's stick to what we decided
+                result: result === 'KILL' ? 'HIT' : result,
                 isKill
             });
 
             if (isKill) {
                 setBattleMsg("WE LOST A PLANE!");
+                const hp = playerPlanesRef.current.find(p => p.id === target.planeId);
+                if (hp) hp.isDestroyed = true;
+
+                const allL = playerPlanesRef.current.every(p => p.isDestroyed);
+                if (allL) {
+                    setTimeout(() => {
+                        setWinner('COMPUTER');
+                        setGameState('GAME_OVER');
+                        setBattleMsg("MISSION FAILED");
+                        setPlayerLosses(prevL => {
+                            const newLosses = prevL + 1;
+                            submitScore(username, playerWinsRef.current, newLosses, totalPlanesDestroyedRef.current, walletAddress);
+                            return newLosses;
+                        });
+                    }, 1000);
+                }
             } else if (result === 'HIT') {
                 setBattleMsg("WE'RE HIT!");
             } else {
                 setBattleMsg("THEY MISSED!");
             }
-
-            // It's now my turn
             setTurn('PLAYER');
         };
 
         const handleShotFeedback = (data: any) => {
-            // My shot result
             const { Coordinate, result, isKill } = data;
-
             setComputerGrid(prev => {
                 const g = prev.map(r => r.map(c => ({ ...c })));
                 const cell = g[Coordinate.y][Coordinate.x];
-
-                if (result === 'HIT') {
-                    cell.state = isKill ? 'DEAD_BODY' : 'HIT';
-                    cell.planeId = -1; // Mark as hit on something
+                if (result === 'HIT' || result === 'KILL') {
+                    cell.state = isKill ? 'DEAD_HEAD' : 'HIT';
+                    cell.planeId = -1;
                 } else {
                     cell.state = 'MISS';
                 }
                 return g;
             });
 
-            if (result === 'HIT') {
-                setBattleMsg(isKill ? "ENEMY PLANE DESTROYED!" : "ENEMY HIT!");
+            if (result === 'HIT' || result === 'KILL') {
+                if (isKill) {
+                    setBattleMsg("ENEMY PLANE DESTROYED!");
+                    setTotalPlanesDestroyed(prev => prev + 1);
+                    setPlayerScore(ps => {
+                        const ns = ps + 1;
+                        if (ns === 3) {
+                            setTimeout(() => {
+                                setWinner('PLAYER');
+                                setGameState('GAME_OVER');
+                                setBattleMsg("MISSION ACCOMPLISHED");
+                                const wins = playerWinsRef.current + 1;
+                                const kills = totalPlanesDestroyedRef.current + 1;
+                                setPlayerWins(wins);
+                                submitScore(username, wins, playerLossesRef.current, kills, walletAddress);
+                            }, 1000);
+                        }
+                        return ns;
+                    });
+                } else {
+                    setBattleMsg("ENEMY HIT!");
+                }
             } else {
                 setBattleMsg("MISS!");
-                setTurn('COMPUTER'); // Turn passes to opponent
+                setTurn('COMPUTER');
             }
         };
 
@@ -254,9 +293,7 @@ export default function App() {
                 setWinner('PLAYER');
                 setGameState('GAME_OVER');
                 setBattleMsg("OPPONENT DISCONNECTED");
-
-                // Submit score
-                submitScore(username, playerWinsRef.current + 1, playerLossesRef.current, totalPlanesDestroyed, walletAddress);
+                submitScore(username, playerWinsRef.current + 1, playerLossesRef.current, totalPlanesDestroyedRef.current, walletAddress);
             }
         };
 
@@ -266,9 +303,7 @@ export default function App() {
                 setWinner('PLAYER');
                 setGameState('GAME_OVER');
                 setBattleMsg("OPPONENT RESIGNED");
-
-                // Submit score
-                submitScore(username, playerWinsRef.current + 1, playerLossesRef.current, totalPlanesDestroyed, walletAddress);
+                submitScore(username, playerWinsRef.current + 1, playerLossesRef.current, totalPlanesDestroyedRef.current, walletAddress);
             }
         };
 
@@ -283,7 +318,7 @@ export default function App() {
             socket.off('opponent_disconnected', handleOpponentDisconnected);
             socket.off('opponent_resigned', handleOpponentResigned);
         };
-    }, [socket, roomId]); // Re-bind when socket/room changes (or grid ref updates implicitly)
+    }, [socket, roomId]);
 
     const fetchLeaderboard = async () => {
         setServerStatus('LOADING');
@@ -873,7 +908,7 @@ export default function App() {
             <SafeAreaView style={styles.container}>
                 <StatusBar style="light" />
 
-                {gameState !== 'LOGIN' && gameState !== 'SETUP' && (
+                {(gameState === 'LOBBY' || gameState === 'SEARCHING') && (
                     <>
                         <View style={styles.topBar}>
                             <View style={styles.profileBadgeSmall}>
