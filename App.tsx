@@ -822,7 +822,7 @@ export default function App() {
             <SafeAreaView style={styles.container}>
                 <StatusBar style="light" />
 
-                {gameState !== 'LOGIN' && (
+                {gameState !== 'LOGIN' && gameState !== 'SETUP' && (
                     <>
                         <View style={styles.topBar}>
                             <View style={styles.profileBadgeSmall}>
@@ -992,6 +992,17 @@ export default function App() {
                                     )}
                                 </View>
                             )}
+
+                            <TouchableOpacity
+                                style={[styles.button, { backgroundColor: '#333', marginTop: 30, width: 140, height: 45 }]}
+                                onPress={() => {
+                                    setGameState('LOBBY');
+                                    setIsFleetReady(false);
+                                    // If multiplayer, we might need to notify server, but for now simple return
+                                }}
+                            >
+                                <Text style={[styles.buttonText, { fontSize: 14 }]}>RESIGN</Text>
+                            </TouchableOpacity>
                         </View>
                     )
                 }
