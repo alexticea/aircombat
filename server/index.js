@@ -18,6 +18,7 @@ const PilotSchema = new mongoose.Schema({
     username: { type: String, required: true },
     walletAddress: { type: String, unique: true, sparse: true },
     wins: { type: Number, default: 0 },
+    losses: { type: Number, default: 0 },
     kills: { type: Number, default: 0 },
     updatedAt: { type: Date, default: Date.now }
 });
@@ -38,7 +39,7 @@ app.get('/leaderboard', async (req, res) => {
 
 // POST Update Score
 app.post('/update-score', async (req, res) => {
-    const { username, wins, kills, walletAddress } = req.body;
+    const { username, wins, losses, kills, walletAddress } = req.body;
 
     try {
         let pilot;
@@ -51,12 +52,13 @@ app.post('/update-score', async (req, res) => {
                 // Update existing wallet user (rename and update stats)
                 pilot.username = username;
                 pilot.wins = wins;
+                pilot.losses = losses || 0;
                 pilot.kills = kills;
                 pilot.updatedAt = new Date();
                 await pilot.save();
             } else {
                 // Create new wallet user
-                pilot = new Pilot({ username, walletAddress, wins, kills });
+                pilot = new Pilot({ username, walletAddress, wins, losses: losses || 0, kills });
                 await pilot.save();
             }
         } else {
@@ -64,7 +66,7 @@ app.post('/update-score', async (req, res) => {
             pilot = await Pilot.findOneAndUpdate(
                 { username },
                 {
-                    $set: { wins, kills, updatedAt: new Date() }
+                    $set: { wins, losses: losses || 0, kills, updatedAt: new Date() }
                 },
                 { upsert: true, new: true }
             );

@@ -37,12 +37,13 @@ export default function App() {
     const [username, setUsername] = useState('Pilot_' + Math.floor(1000 + Math.random() * 9000));
     const [walletAddress, setWalletAddress] = useState<string | null>(null);
     const [playerWins, setPlayerWins] = useState(0);
+    const [playerLosses, setPlayerLosses] = useState(0);
     const [totalPlanesDestroyed, setTotalPlanesDestroyed] = useState(0);
     const [showLeaderboard, setShowLeaderboard] = useState(false);
     const [isEditingName, setIsEditingName] = useState(false);
     const [tempName, setTempName] = useState('');
     const [showRecap, setShowRecap] = useState(false);
-    const [leaderboard, setLeaderboard] = useState<{ username: string, wins: number, kills: number }[]>([]);
+    const [leaderboard, setLeaderboard] = useState<{ username: string, wins: number, losses: number, kills: number }[]>([]);
     const [balance, setBalance] = useState<number | null>(null);
 
     // For local testing: 'http://localhost:5000' or your local IP
@@ -154,6 +155,9 @@ export default function App() {
     const gameStateRef = useRef(gameState);
     useEffect(() => { gameStateRef.current = gameState; }, [gameState]);
 
+    const [playerLossesRef] = [useRef(playerLosses)];
+    useEffect(() => { playerLossesRef.current = playerLosses; }, [playerLosses]);
+
     const playerWinsRef = useRef(playerWins);
     useEffect(() => { playerWinsRef.current = playerWins; }, [playerWins]);
 
@@ -252,7 +256,7 @@ export default function App() {
                 setBattleMsg("OPPONENT DISCONNECTED");
 
                 // Submit score
-                submitScore(username, playerWinsRef.current + 1, totalPlanesDestroyed);
+                submitScore(username, playerWinsRef.current + 1, playerLossesRef.current, totalPlanesDestroyed, walletAddress);
             }
         };
 
@@ -264,7 +268,7 @@ export default function App() {
                 setBattleMsg("OPPONENT RESIGNED");
 
                 // Submit score
-                submitScore(username, playerWinsRef.current + 1, totalPlanesDestroyed);
+                submitScore(username, playerWinsRef.current + 1, playerLossesRef.current, totalPlanesDestroyed, walletAddress);
             }
         };
 
@@ -296,12 +300,12 @@ export default function App() {
         }
     };
 
-    const submitScore = async (name: string, wins: number, kills: number, walletAddress?: string | null) => {
+    const submitScore = async (name: string, wins: number, losses: number, kills: number, walletAddress?: string | null) => {
         try {
             await fetch(`${API_URL}/update-score`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ username: name, wins, kills, walletAddress })
+                body: JSON.stringify({ username: name, wins, losses, kills, walletAddress })
             });
             fetchLeaderboard();
         } catch (err) {
@@ -579,6 +583,11 @@ export default function App() {
                     style: "destructive",
                     onPress: () => {
                         setWinner('COMPUTER');
+                        setPlayerLosses(prev => {
+                            const newLosses = prev + 1;
+                            submitScore(username, playerWins, newLosses, totalPlanesDestroyed, walletAddress);
+                            return newLosses;
+                        });
                         setGameState('GAME_OVER');
                         setBattleMsg("MISSION ABORTED");
 
@@ -749,7 +758,7 @@ export default function App() {
                 const finalKills = currentKills + 1;
                 setPlayerWins(currentWins => {
                     const finalWins = currentWins + 1;
-                    submitScore(username, finalWins, finalKills);
+                    submitScore(username, finalWins, playerLosses, finalKills, walletAddress);
                     return finalWins;
                 });
                 return finalKills;
@@ -817,6 +826,11 @@ export default function App() {
         const allPlayerDestroyed = planesClone.every(p => p.isDestroyed);
         if (allPlayerDestroyed) {
             setWinner('COMPUTER');
+            setPlayerLosses(prev => {
+                const newLosses = prev + 1;
+                submitScore(username, playerWins, newLosses, totalPlanesDestroyed, walletAddress);
+                return newLosses;
+            });
             setComputerScore(3);
             setBattleMsg('DEFEAT!');
             setTimeout(() => {
@@ -1291,8 +1305,7 @@ export default function App() {
                                     onPress={() => {
                                         const newName = tempName || username;
                                         setUsername(newName);
-                                        // @ts-ignore
-                                        submitScore(newName, playerWins, totalPlanesDestroyed, walletAddress);
+                                        submitScore(newName, playerWins, playerLosses, totalPlanesDestroyed, walletAddress);
                                         setIsEditingName(false);
                                     }}
                                 >
@@ -1317,17 +1330,21 @@ export default function App() {
                                                     i === 2 ? <Text style={styles.medal}>🥉</Text> :
                                                         <Text style={styles.leaderRank}>#{i + 1}</Text>}
                                         </View>
-                                        <Text style={[styles.leaderName, ace.username === username && { color: '#6C5CE7' }]}>
-                                            {ace.username.length > 20 ? `${ace.username.slice(0, 4)}...${ace.username.slice(-4)}` : ace.username}
+                                        <Text style={[styles.leaderName, ace.username === username && { color: '#6C5CE7' }]} numberOfLines={1}>
+                                            {ace.username.length > 25 ? `${ace.username.slice(0, 4)}...${ace.username.slice(-4)}` : ace.username}
                                         </Text>
                                         <View style={styles.leaderStats}>
-                                            <View style={styles.statBox}>
+                                            <View style={[styles.statBox, { minWidth: 40 }]}>
                                                 <Text style={styles.statValueMini}>{ace.wins}</Text>
-                                                <Text style={styles.statLabelMini}>WINS</Text>
+                                                <Text style={styles.statLabelMini}>W</Text>
                                             </View>
-                                            <View style={styles.statBox}>
+                                            <View style={[styles.statBox, { minWidth: 40 }]}>
+                                                <Text style={[styles.statValueMini, { color: '#f00' }]}>{ace.losses || 0}</Text>
+                                                <Text style={styles.statLabelMini}>L</Text>
+                                            </View>
+                                            <View style={[styles.statBox, { minWidth: 40 }]}>
                                                 <Text style={[styles.statValueMini, { color: '#0f0' }]}>{ace.kills}</Text>
-                                                <Text style={styles.statLabelMini}>KILLS</Text>
+                                                <Text style={styles.statLabelMini}>K</Text>
                                             </View>
                                         </View>
                                     </View>
