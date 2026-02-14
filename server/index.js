@@ -177,8 +177,17 @@ io.on('connection', (socket) => {
         // Remove from queue
         matchmakingQueue = matchmakingQueue.filter(p => p.id !== socket.id);
 
-        // Handle active games?
-        // Ideally notify opponent 'opponent_disconnected'
+        // Notify opponent in active games
+        for (const roomId in activeGames) {
+            const game = activeGames[roomId];
+            if (game.p1 === socket.id || game.p2 === socket.id) {
+                const opponentId = game.p1 === socket.id ? game.p2 : game.p1;
+                io.to(opponentId).emit('opponent_disconnected');
+                delete activeGames[roomId];
+                console.log(`Game ${roomId} ended due to disconnect`);
+                break;
+            }
+        }
     });
 });
 

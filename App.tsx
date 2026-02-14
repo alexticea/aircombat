@@ -149,6 +149,12 @@ export default function App() {
     const playerGridRef = useRef(playerGrid);
     useEffect(() => { playerGridRef.current = playerGrid; }, [playerGrid]);
 
+    const gameStateRef = useRef(gameState);
+    useEffect(() => { gameStateRef.current = gameState; }, [gameState]);
+
+    const playerWinsRef = useRef(playerWins);
+    useEffect(() => { playerWinsRef.current = playerWins; }, [playerWins]);
+
     // Create a stable listener for incoming fire that uses the ref
     useEffect(() => {
         if (!socket) return;
@@ -236,12 +242,26 @@ export default function App() {
             }
         };
 
+        const handleOpponentDisconnected = () => {
+            if (gameStateRef.current === 'PLAY' || gameStateRef.current === 'SETUP') {
+                Alert.alert("Victory!", "Opponent disconnected. You win!");
+                setWinner('PLAYER');
+                setGameState('GAME_OVER');
+                setBattleMsg("OPPONENT DISCONNECTED");
+
+                // Submit score
+                submitScore(username, playerWinsRef.current + 1, totalPlanesDestroyed);
+            }
+        };
+
         socket.on('incoming_fire', handleIncomingFire);
         socket.on('shot_feedback', handleShotFeedback);
+        socket.on('opponent_disconnected', handleOpponentDisconnected);
 
         return () => {
             socket.off('incoming_fire', handleIncomingFire);
             socket.off('shot_feedback', handleShotFeedback);
+            socket.off('opponent_disconnected', handleOpponentDisconnected);
         };
     }, [socket, roomId]); // Re-bind when socket/room changes (or grid ref updates implicitly)
 
@@ -942,7 +962,9 @@ export default function App() {
                     gameState === 'PLAY' && (
                         <ScrollView contentContainerStyle={styles.scrollContent}>
                             <View style={styles.section}>
-                                <Text style={[styles.header, { fontSize: 16, color: '#f00' }]}>ENEMY SECTOR</Text>
+                                <Text style={[styles.header, { fontSize: 16, color: '#f00', textTransform: 'uppercase' }]}>
+                                    {isMultiplayer ? (opponentName?.length ? (opponentName.length > 12 ? `${opponentName.slice(0, 4)}...${opponentName.slice(-4)}` : opponentName) : 'ENEMY') : 'CPU SECTOR'}
+                                </Text>
                                 <View>
                                     <Grid
                                         grid={computerGrid}
@@ -962,15 +984,21 @@ export default function App() {
                             </View>
 
                             <View style={styles.scoreBoard}>
-                                <Text style={styles.scoreLabel}>PLAYER </Text>
+                                <Text style={styles.scoreLabel} numberOfLines={1}>
+                                    {username.length > 8 ? `${username.slice(0, 3)}..${username.slice(-2)}` : username}
+                                </Text>
                                 <Text style={styles.scoreValue}>{playerScore}</Text>
-                                <Text style={styles.scoreVs}>  VS  </Text>
+                                <Text style={styles.scoreVs}> VS </Text>
                                 <Text style={styles.scoreValue}>{computerScore}</Text>
-                                <Text style={styles.scoreLabel}> ENEMY</Text>
+                                <Text style={styles.scoreLabel} numberOfLines={1}>
+                                    {isMultiplayer ? (opponentName?.length && opponentName.length > 8 ? `${opponentName.slice(0, 3)}..${opponentName.slice(-2)}` : (opponentName || 'ENEMY')) : 'CPU'}
+                                </Text>
                             </View>
 
                             <View style={styles.section}>
-                                <Text style={[styles.header, { fontSize: 16, color: '#0f0' }]}>YOUR FLEET</Text>
+                                <Text style={[styles.header, { fontSize: 16, color: '#0f0', textTransform: 'uppercase' }]}>
+                                    {username.length > 12 ? `${username.slice(0, 4)}...${username.slice(-4)}` : username}
+                                </Text>
                                 <View>
                                     <Grid
                                         grid={playerGrid}
