@@ -1,5 +1,6 @@
-import { install } from 'react-native-quick-crypto';
-install(); // Install quick-crypto before other polyfills
+// react-native-quick-crypto removed for Expo Go compatibility
+// import { install } from 'react-native-quick-crypto';
+// install(); 
 
 import 'react-native-get-random-values';
 import { Buffer } from '@craftzdog/react-native-buffer';
