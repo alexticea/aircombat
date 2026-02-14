@@ -1776,7 +1776,7 @@ const styles = StyleSheet.create({
     },
     topBar: {
         position: 'absolute',
-        top: 20,
+        top: '5%',
         left: 20,
         right: 20,
         flexDirection: 'row',
