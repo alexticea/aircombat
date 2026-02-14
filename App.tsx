@@ -56,6 +56,7 @@ export default function App() {
     const [roomId, setRoomId] = useState<string | null>(null);
     const [isMultiplayer, setIsMultiplayer] = useState(false);
     const [opponentName, setOpponentName] = useState<string | null>(null);
+    const [isFleetReady, setIsFleetReady] = useState(false);
 
     // Initialize Socket
     useEffect(() => {
@@ -81,6 +82,7 @@ export default function App() {
             setPlayerPlanes([]);
             setComputerPlanes([]);
             setWinner(null);
+            setIsFleetReady(false);
             setBattleMsg(`Versus ${data.opponent?.username || 'Enemy'}`);
         });
 
@@ -552,6 +554,7 @@ export default function App() {
         setCHits(0);
         setCMisses(0);
         setShowRecap(false);
+        setIsFleetReady(false);
     };
 
     // Setup Phase
@@ -612,12 +615,8 @@ export default function App() {
         setPlayerPlanes(prev => {
             const next = [...prev, newPlane];
             if (next.length === Game.PLANE_COUNT) {
-                if (isMultiplayer && socket && roomId) {
-                    // Multiplayer: Notify server
-                    setBattleMsg("Waiting for opponent...");
-                    socket.emit('place_fleet', { roomId, planes: next });
-                } else {
-                    // Single Player: Start Game
+                if (!isMultiplayer) {
+                    // Single Player: Start Game Automatically
                     gameStartTimeout.current = setTimeout(() => {
                         setGameState('PLAY');
                         setTurn('PLAYER');
@@ -628,8 +627,15 @@ export default function App() {
         });
     };
 
+    const deployFleet = () => {
+        if (playerPlanes.length < Game.PLANE_COUNT || !socket || !roomId) return;
+        setIsFleetReady(true);
+        setBattleMsg("Waiting for opponent...");
+        socket.emit('place_fleet', { roomId, planes: playerPlanes });
+    };
+
     const undoPlacement = () => {
-        if (playerPlanes.length === 0 || isFlying) return;
+        if (playerPlanes.length === 0 || isFlying || isFleetReady) return;
 
         // Cancel game start if pending
         if (gameStartTimeout.current) {
@@ -950,8 +956,18 @@ export default function App() {
                                 </View>
                             )}
                             {(playerPlanes.length >= Game.PLANE_COUNT || isFlying) && (
-                                <View style={[styles.dock, { opacity: 0.5 }]}>
-                                    <Text style={styles.dockText}>{isFlying ? "DEPLOYING..." : "FLEET READY!"}</Text>
+                                <View style={styles.dock}>
+                                    {isFlying ? (
+                                        <Text style={styles.dockText}>DEPLOYING...</Text>
+                                    ) : isFleetReady ? (
+                                        <Text style={[styles.dockText, { color: '#0f0' }]}>WAITING FOR OPPONENT...</Text>
+                                    ) : isMultiplayer ? (
+                                        <TouchableOpacity style={styles.readyButton} onPress={deployFleet}>
+                                            <Text style={styles.readyButtonText}>READY TO BATTLE</Text>
+                                        </TouchableOpacity>
+                                    ) : (
+                                        <Text style={styles.dockText}>FLEET READY!</Text>
+                                    )}
                                 </View>
                             )}
                         </View>
@@ -1759,7 +1775,25 @@ const styles = StyleSheet.create({
         borderRadius: 25,
         minWidth: 120,
         alignItems: 'center',
-    }
+    },
+    readyButton: {
+        backgroundColor: '#00b894',
+        paddingVertical: 12,
+        paddingHorizontal: 30,
+        borderRadius: 25,
+        elevation: 10,
+        shadowColor: '#00b894',
+        shadowOpacity: 0.8,
+        shadowRadius: 15,
+        borderWidth: 2,
+        borderColor: '#fff',
+    },
+    readyButtonText: {
+        color: '#fff',
+        fontWeight: '900',
+        fontSize: 18,
+        letterSpacing: 2,
+    },
 });
 
 /**
