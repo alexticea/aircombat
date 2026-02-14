@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+﻿import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Alert, ScrollView, PanResponder, Dimensions, LayoutChangeEvent, Animated, TextInput, Modal, Platform } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
@@ -8,18 +8,10 @@ import { PlaneVisual } from './components/PlaneVisual';
 import * as Game from './GameLogic';
 import { Coordinate, GridCell, Plane } from './GameLogic';
 
-import { transact, Web3MobileWallet } from '@solana-mobile/mobile-wallet-adapter-protocol-web3js';
 import { PublicKey, Connection, clusterApiUrl, LAMPORTS_PER_SOL } from '@solana/web3.js';
-
-import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Simple Linear Gradient BG placeholder (or use dark solid color)
 const BG_COLOR = '#050510';
-const APP_IDENTITY = {
-    name: 'AirCombat',
-    uri: 'https://aircombat.onrender.com/',
-    icon: 'favicon.ico', // relative path to app icon if any
-};
 
 export default function App() {
     const [gameState, setGameState] = useState<'LOGIN' | 'LOBBY' | 'SETUP' | 'PLAY' | 'GAME_OVER'>('LOGIN');
@@ -268,490 +260,537 @@ export default function App() {
             return;
         }
 
-        try {
-            const { address, publicKey } = await transact(async (wallet: Web3MobileWallet) => {
-                let authToken = await AsyncStorage.getItem('solana_auth_token');
-                let authorizationResult;
-
-                try {
-                    if (authToken) {
-                        authorizationResult = await wallet.reauthorize({
-                            auth_token: authToken,
-                            identity: APP_IDENTITY,
-                        });
-                    } else {
-                        throw new Error('No token');
-                    }
-                } catch (e) {
-                    authorizationResult = await wallet.authorize({
-                        cluster: 'devnet',
-                        identity: APP_IDENTITY,
-                    });
-                }
-
-                if (authorizationResult.auth_token) {
-                    await AsyncStorage.setItem('solana_auth_token', authorizationResult.auth_token);
-                }
-
-                const firstAccount = authorizationResult.accounts[0];
-                const key = new PublicKey(firstAccount.address);
-                const addr = key.toBase58();
-
-                // Sign a message for verification (optional but good practice)
-                const message = 'Log in to AirCombat';
-                const messageBuffer = Buffer.from(message);
-
-                await wallet.signMessages({
-                    addresses: [addr],
-                    payloads: [messageBuffer.toString('base64')],
-                });
-
-                return { address: addr, publicKey: key };
-            });
-
-            // If successful (and returned vars), update state here
-            if (address && publicKey) {
-                setUsername(address);
-                setWalletAddress(address);
-
-                try {
-                    const connection = new Connection(clusterApiUrl('devnet'), 'confirmed');
-                    const bal = await connection.getBalance(publicKey);
-                    setBalance(bal / LAMPORTS_PER_SOL);
-                } catch (e) {
-                    console.error("Failed to fetch balance", e);
-                }
-
-                setTimeout(() => {
-                    setGameState('LOBBY');
-                    fetchLeaderboard();
-                }, 500);
-            }
-
-        } catch (err: any) {
-            console.log('Mobile Wallet Adapter Error:', err);
-            // Fallback for simple deeplinking if MWA fails or not supported
-            if (err.message && err.message.includes('No wallet found')) {
-                Linking.openURL('https://solflare.com/ul/v1/connect');
-            } else {
-                throw err;
-            }
+        // Mobile Fallback
+        if (true) {
+            Alert.alert("Mobile Wallet", "Mobile Wallet Adapter removed. Logging in as guest.");
+            setGameState('LOBBY');
+            fetchLeaderboard();
+            return;
         }
-    };
+// MWA Removed
+};
 
-    const startGame = () => {
-        setPlayerGrid(Game.createEmptyGrid());
-        setPlayerPlanes([]);
-        setComputerGrid(Game.createEmptyGrid());
-        setComputerPlanes(Game.generateRandomBoard());
-        setGameState('SETUP');
-        setWinner(null);
-        setPlayerScore(0);
-        setComputerScore(0);
-        setPHits(0);
-        setPMisses(0);
-        setCHits(0);
-        setCMisses(0);
-        setShowRecap(false);
-    };
+const startGame = () => {
+    setPlayerGrid(Game.createEmptyGrid());
+    setPlayerPlanes([]);
+    setComputerGrid(Game.createEmptyGrid());
+    setComputerPlanes(Game.generateRandomBoard());
+    setGameState('SETUP');
+    setWinner(null);
+    setPlayerScore(0);
+    setComputerScore(0);
+    setPHits(0);
+    setPMisses(0);
+    setCHits(0);
+    setCMisses(0);
+    setShowRecap(false);
+};
 
-    // Setup Phase
-    const handleSetupCellPress = (x: number, y: number, fromX?: number, fromY?: number) => {
-        if (playerPlanes.length >= Game.PLANE_COUNT || isFlying) return;
+// Setup Phase
+const handleSetupCellPress = (x: number, y: number, fromX?: number, fromY?: number) => {
+    if (playerPlanes.length >= Game.PLANE_COUNT || isFlying) return;
 
-        const newCells = Game.getPlaneCells({ x, y }, setupOrientation);
-        if (Game.isValidPlacement(playerPlanes, newCells)) {
-            if (fromX !== undefined && fromY !== undefined) {
-                // Animate Flight
-                setIsFlying(true);
-                setFlyOrientation(setupOrientation);
-                flyAnim.setValue({ x: fromX, y: fromY });
+    const newCells = Game.getPlaneCells({ x, y }, setupOrientation);
+    if (Game.isValidPlacement(playerPlanes, newCells)) {
+        if (fromX !== undefined && fromY !== undefined) {
+            // Animate Flight
+            setIsFlying(true);
+            setFlyOrientation(setupOrientation);
+            flyAnim.setValue({ x: fromX, y: fromY });
 
-                const offsets = getOffsets(setupOrientation, CELL_SIZE);
-                const targetX = absGridPos.x + 2 + 25 + x * CELL_SIZE + offsets.x;
-                const targetY = absGridPos.y + 2 + 20 + y * CELL_SIZE + offsets.y;
+            const offsets = getOffsets(setupOrientation, CELL_SIZE);
+            const targetX = absGridPos.x + 2 + 25 + x * CELL_SIZE + offsets.x;
+            const targetY = absGridPos.y + 2 + 20 + y * CELL_SIZE + offsets.y;
 
-                Animated.timing(flyAnim, {
-                    toValue: { x: targetX, y: targetY },
-                    duration: 500,
-                    useNativeDriver: false,
-                }).start(() => {
-                    setIsFlying(false);
-                    completePlacement(x, y);
-                });
-            } else {
+            Animated.timing(flyAnim, {
+                toValue: { x: targetX, y: targetY },
+                duration: 500,
+                useNativeDriver: false,
+            }).start(() => {
+                setIsFlying(false);
                 completePlacement(x, y);
-            }
+            });
         } else {
-            Alert.alert('Invalid Placement', 'Planes cannot overlap each other.');
+            completePlacement(x, y);
         }
+    } else {
+        Alert.alert('Invalid Placement', 'Planes cannot overlap each other.');
+    }
+};
+
+const handleSetupCellPressRef = useRef(handleSetupCellPress);
+useEffect(() => {
+    handleSetupCellPressRef.current = handleSetupCellPress;
+});
+
+const completePlacement = (x: number, y: number) => {
+    const newCells = Game.getPlaneCells({ x, y }, setupOrientation);
+    const newPlane: Plane = {
+        id: playerPlanes.length,
+        head: { x, y },
+        orientation: setupOrientation,
+        isDestroyed: false,
+        cells: newCells
     };
 
-    const handleSetupCellPressRef = useRef(handleSetupCellPress);
-    useEffect(() => {
-        handleSetupCellPressRef.current = handleSetupCellPress;
+    setPlayerGrid(prevGrid => {
+        const nextGrid = prevGrid.map(row => row.map(c => ({ ...c })));
+        newCells.forEach(c => {
+            nextGrid[c.y][c.x] = { ...nextGrid[c.y][c.x], planeId: newPlane.id };
+        });
+        return nextGrid;
     });
 
-    const completePlacement = (x: number, y: number) => {
-        const newCells = Game.getPlaneCells({ x, y }, setupOrientation);
-        const newPlane: Plane = {
-            id: playerPlanes.length,
-            head: { x, y },
-            orientation: setupOrientation,
-            isDestroyed: false,
-            cells: newCells
-        };
+    setPlayerPlanes(prev => {
+        const next = [...prev, newPlane];
+        if (next.length === Game.PLANE_COUNT) {
+            gameStartTimeout.current = setTimeout(() => {
+                setGameState('PLAY');
+                setTurn('PLAYER');
+            }, 2000);
+        }
+        return next;
+    });
+};
 
+const undoPlacement = () => {
+    if (playerPlanes.length === 0 || isFlying) return;
+
+    // Cancel game start if pending
+    if (gameStartTimeout.current) {
+        clearTimeout(gameStartTimeout.current);
+        gameStartTimeout.current = null;
+    }
+
+    const updatedPlanes = [...playerPlanes];
+    const removedPlane = updatedPlanes.pop();
+    setPlayerPlanes(updatedPlanes);
+
+    if (removedPlane) {
         setPlayerGrid(prevGrid => {
             const nextGrid = prevGrid.map(row => row.map(c => ({ ...c })));
-            newCells.forEach(c => {
-                nextGrid[c.y][c.x] = { ...nextGrid[c.y][c.x], planeId: newPlane.id };
+            removedPlane.cells.forEach(c => {
+                nextGrid[c.y][c.x] = { ...nextGrid[c.y][c.x], planeId: undefined };
             });
             return nextGrid;
         });
+    }
+};
 
-        setPlayerPlanes(prev => {
-            const next = [...prev, newPlane];
-            if (next.length === Game.PLANE_COUNT) {
-                gameStartTimeout.current = setTimeout(() => {
-                    setGameState('PLAY');
-                    setTurn('PLAYER');
-                }, 2000);
-            }
-            return next;
+const rotateLeft = () => {
+    const next = { 'N': 'W', 'W': 'S', 'S': 'E', 'E': 'N' } as const;
+    setSetupOrientation(next[setupOrientation]);
+};
+
+const rotateRight = () => {
+    const next = { 'N': 'E', 'E': 'S', 'S': 'W', 'W': 'N' } as const;
+    setSetupOrientation(next[setupOrientation]);
+};
+
+// Game Loop
+const handleAttack = (x: number, y: number) => {
+    if (turn !== 'PLAYER' || gameState !== 'PLAY') return;
+
+    // Clone grid and planes to avoid direct mutation
+    const gridClone = computerGrid.map(row => row.map(c => ({ ...c })));
+    const planesClone = computerPlanes.map(p => ({ ...p, cells: [...p.cells] }));
+
+    const result = Game.fireShot(gridClone, planesClone, { x, y });
+
+    setComputerGrid(gridClone);
+    setComputerPlanes(planesClone);
+
+    // Check Win using the newly updated planes
+    const allComputerDestroyed = planesClone.every(p => p.isDestroyed);
+    if (allComputerDestroyed) {
+        setTotalPlanesDestroyed(currentKills => {
+            const finalKills = currentKills + 1;
+            setPlayerWins(currentWins => {
+                const finalWins = currentWins + 1;
+                submitScore(username, finalWins, finalKills);
+                return finalWins;
+            });
+            return finalKills;
         });
-    };
+        setWinner('PLAYER');
+        setPlayerScore(3);
+        setBattleMsg('VICTORY!');
+        setTimeout(() => {
+            setGameState('GAME_OVER');
+            setBattleMsg(null);
+        }, 5000);
+        return;
+    }
 
-    const undoPlacement = () => {
-        if (playerPlanes.length === 0 || isFlying) return;
+    if (result.result === 'HIT') {
+        setPHits(prev => prev + 1);
+        setBattleMsg('YOU HIT!');
+        setTimeout(() => {
+            setBattleMsg(null);
+            setTurn('COMPUTER');
+            setTimeout(computerTurn, 1000);
+        }, 1200);
+    } else if (result.result === 'KILL') {
+        setPHits(prev => prev + 1);
+        setBattleMsg('YOU DESTROYED!');
+        setPlayerScore(prev => prev + 1);
+        setTotalPlanesDestroyed(prev => prev + 1);
+        setTimeout(() => {
+            setBattleMsg(null);
+            setTurn('COMPUTER');
+            setTimeout(computerTurn, 1000);
+        }, 1500);
+    } else {
+        setPMisses(prev => prev + 1);
+        setBattleMsg('YOU MISSED!');
+        setTimeout(() => {
+            setBattleMsg(null);
+            setTurn('COMPUTER');
+            setTimeout(computerTurn, 1000);
+        }, 1000);
+    }
+};
 
-        // Cancel game start if pending
-        if (gameStartTimeout.current) {
-            clearTimeout(gameStartTimeout.current);
-            gameStartTimeout.current = null;
-        }
+const computerTurn = () => {
+    if (gameState !== 'PLAY') return;
 
-        const updatedPlanes = [...playerPlanes];
-        const removedPlane = updatedPlanes.pop();
-        setPlayerPlanes(updatedPlanes);
+    let target = { x: Math.floor(Math.random() * 10), y: Math.floor(Math.random() * 10) };
+    let safeGuard = 0;
 
-        if (removedPlane) {
-            setPlayerGrid(prevGrid => {
-                const nextGrid = prevGrid.map(row => row.map(c => ({ ...c })));
-                removedPlane.cells.forEach(c => {
-                    nextGrid[c.y][c.x] = { ...nextGrid[c.y][c.x], planeId: undefined };
-                });
-                return nextGrid;
-            });
-        }
-    };
+    // Clone grid and planes to avoid direct mutation
+    const gridClone = playerGrid.map(row => row.map(c => ({ ...c })));
+    const planesClone = playerPlanes.map(p => ({ ...p, cells: [...p.cells] }));
 
-    const rotateLeft = () => {
-        const next = { 'N': 'W', 'W': 'S', 'S': 'E', 'E': 'N' } as const;
-        setSetupOrientation(next[setupOrientation]);
-    };
+    while (gridClone[target.y][target.x].state !== 'EMPTY' && safeGuard < 100) {
+        target = { x: Math.floor(Math.random() * 10), y: Math.floor(Math.random() * 10) };
+        safeGuard++;
+    }
 
-    const rotateRight = () => {
-        const next = { 'N': 'E', 'E': 'S', 'S': 'W', 'W': 'N' } as const;
-        setSetupOrientation(next[setupOrientation]);
-    };
+    const computerShotResult = Game.fireShot(gridClone, planesClone, target);
 
-    // Game Loop
-    const handleAttack = (x: number, y: number) => {
-        if (turn !== 'PLAYER' || gameState !== 'PLAY') return;
+    setPlayerGrid(gridClone);
+    setPlayerPlanes(planesClone);
 
-        // Clone grid and planes to avoid direct mutation
-        const gridClone = computerGrid.map(row => row.map(c => ({ ...c })));
-        const planesClone = computerPlanes.map(p => ({ ...p, cells: [...p.cells] }));
+    // Check Loss using the newly updated planes
+    const allPlayerDestroyed = planesClone.every(p => p.isDestroyed);
+    if (allPlayerDestroyed) {
+        setWinner('COMPUTER');
+        setComputerScore(3);
+        setBattleMsg('DEFEAT!');
+        setTimeout(() => {
+            setGameState('GAME_OVER');
+            setBattleMsg(null);
+        }, 5000);
+        return;
+    }
 
-        const result = Game.fireShot(gridClone, planesClone, { x, y });
-
-        setComputerGrid(gridClone);
-        setComputerPlanes(planesClone);
-
-        // Check Win using the newly updated planes
-        const allComputerDestroyed = planesClone.every(p => p.isDestroyed);
-        if (allComputerDestroyed) {
-            setTotalPlanesDestroyed(currentKills => {
-                const finalKills = currentKills + 1;
-                setPlayerWins(currentWins => {
-                    const finalWins = currentWins + 1;
-                    submitScore(username, finalWins, finalKills);
-                    return finalWins;
-                });
-                return finalKills;
-            });
-            setWinner('PLAYER');
-            setPlayerScore(3);
-            setBattleMsg('VICTORY!');
+    if (computerShotResult) {
+        if (computerShotResult.result === 'HIT') {
+            setCHits(prev => prev + 1);
+            setBattleMsg('ENEMY HIT!');
             setTimeout(() => {
-                setGameState('GAME_OVER');
                 setBattleMsg(null);
-            }, 5000);
-            return;
-        }
-
-        if (result.result === 'HIT') {
-            setPHits(prev => prev + 1);
-            setBattleMsg('YOU HIT!');
-            setTimeout(() => {
-                setBattleMsg(null);
-                setTurn('COMPUTER');
-                setTimeout(computerTurn, 1000);
+                setTurn('PLAYER');
             }, 1200);
-        } else if (result.result === 'KILL') {
-            setPHits(prev => prev + 1);
-            setBattleMsg('YOU DESTROYED!');
-            setPlayerScore(prev => prev + 1);
-            setTotalPlanesDestroyed(prev => prev + 1);
+        } else if (computerShotResult.result === 'KILL') {
+            setCHits(prev => prev + 1);
+            setBattleMsg('ENEMY DESTROYED!');
+            setComputerScore(prev => prev + 1);
             setTimeout(() => {
                 setBattleMsg(null);
-                setTurn('COMPUTER');
-                setTimeout(computerTurn, 1000);
+                setTurn('PLAYER');
             }, 1500);
         } else {
-            setPMisses(prev => prev + 1);
-            setBattleMsg('YOU MISSED!');
+            setCMisses(prev => prev + 1);
+            setBattleMsg('ENEMY MISS!');
             setTimeout(() => {
                 setBattleMsg(null);
-                setTurn('COMPUTER');
-                setTimeout(computerTurn, 1000);
+                setTurn('PLAYER');
             }, 1000);
         }
-    };
+        setTurn('PLAYER');
+    }
+};
 
-    const computerTurn = () => {
-        if (gameState !== 'PLAY') return;
+return (
+    <SafeAreaProvider>
+        <SafeAreaView style={styles.container}>
+            <StatusBar style="light" />
 
-        let target = { x: Math.floor(Math.random() * 10), y: Math.floor(Math.random() * 10) };
-        let safeGuard = 0;
-
-        // Clone grid and planes to avoid direct mutation
-        const gridClone = playerGrid.map(row => row.map(c => ({ ...c })));
-        const planesClone = playerPlanes.map(p => ({ ...p, cells: [...p.cells] }));
-
-        while (gridClone[target.y][target.x].state !== 'EMPTY' && safeGuard < 100) {
-            target = { x: Math.floor(Math.random() * 10), y: Math.floor(Math.random() * 10) };
-            safeGuard++;
-        }
-
-        const computerShotResult = Game.fireShot(gridClone, planesClone, target);
-
-        setPlayerGrid(gridClone);
-        setPlayerPlanes(planesClone);
-
-        // Check Loss using the newly updated planes
-        const allPlayerDestroyed = planesClone.every(p => p.isDestroyed);
-        if (allPlayerDestroyed) {
-            setWinner('COMPUTER');
-            setComputerScore(3);
-            setBattleMsg('DEFEAT!');
-            setTimeout(() => {
-                setGameState('GAME_OVER');
-                setBattleMsg(null);
-            }, 5000);
-            return;
-        }
-
-        if (computerShotResult) {
-            if (computerShotResult.result === 'HIT') {
-                setCHits(prev => prev + 1);
-                setBattleMsg('ENEMY HIT!');
-                setTimeout(() => {
-                    setBattleMsg(null);
-                    setTurn('PLAYER');
-                }, 1200);
-            } else if (computerShotResult.result === 'KILL') {
-                setCHits(prev => prev + 1);
-                setBattleMsg('ENEMY DESTROYED!');
-                setComputerScore(prev => prev + 1);
-                setTimeout(() => {
-                    setBattleMsg(null);
-                    setTurn('PLAYER');
-                }, 1500);
-            } else {
-                setCMisses(prev => prev + 1);
-                setBattleMsg('ENEMY MISS!');
-                setTimeout(() => {
-                    setBattleMsg(null);
-                    setTurn('PLAYER');
-                }, 1000);
-            }
-            setTurn('PLAYER');
-        }
-    };
-
-    return (
-        <SafeAreaProvider>
-            <SafeAreaView style={styles.container}>
-                <StatusBar style="light" />
-
-                {gameState === 'LOBBY' && (
-                    <View style={styles.topBar}>
-                        <View style={styles.profileBadgeSmall}>
-                            <View style={styles.avatarSmall} />
-                            <View>
-                                <Text style={styles.profileNameSmall}>{username.length > 20 ? `${username.slice(0, 4)}...${username.slice(-4)}` : username}</Text>
-                                {balance !== null && <Text style={styles.balanceText}>{balance.toFixed(2)} SOL</Text>}
-                            </View>
+            {gameState === 'LOBBY' && (
+                <View style={styles.topBar}>
+                    <View style={styles.profileBadgeSmall}>
+                        <View style={styles.avatarSmall} />
+                        <View>
+                            <Text style={styles.profileNameSmall}>{username.length > 20 ? `${username.slice(0, 4)}...${username.slice(-4)}` : username}</Text>
+                            {balance !== null && <Text style={styles.balanceText}>{balance.toFixed(2)} SOL</Text>}
                         </View>
                     </View>
-                )}
+                </View>
+            )}
 
-                {gameState === 'LOGIN' && (
-                    <View style={styles.center}>
-                        <Text style={styles.title}>AIR COMBAT</Text>
-                        <Text style={styles.subtitle}>-= SOLANA BATTLES =-</Text>
-                        <TouchableOpacity style={styles.button} onPress={handleLogin}>
-                            <Text style={styles.buttonText}>Sign with Wallet!</Text>
+            {gameState === 'LOGIN' && (
+                <View style={styles.center}>
+                    <Text style={styles.title}>AIR COMBAT</Text>
+                    <Text style={styles.subtitle}>-= SOLANA BATTLES =-</Text>
+                    <TouchableOpacity style={styles.button} onPress={handleLogin}>
+                        <Text style={styles.buttonText}>Sign with Wallet!</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                        style={[styles.button, { backgroundColor: '#333', marginTop: 20 }]}
+                        onPress={() => setGameState('LOBBY')}
+                    >
+                        <Text style={styles.buttonText}>PLAY AS GUEST</Text>
+                    </TouchableOpacity>
+                </View>
+            )}
+
+            {gameState === 'LOBBY' && (
+                <View style={styles.center}>
+                    <View style={styles.profileBadge}>
+                        <Text style={styles.pilotRank}>ADMIRAL</Text>
+                        <Text style={styles.pilotName}>
+                            {username.length > 20 ? `${username.slice(0, 4)}...${username.slice(-4)}` : username}
+                        </Text>
+
+                        <View style={styles.badgeLine} />
+
+                        <View style={styles.miniStatsRow}>
+                            <View style={styles.miniStat}>
+                                <Text style={styles.miniStatLabel}>BATTLES WON</Text>
+                                <Text style={styles.miniStatValue}>{playerWins}</Text>
+                            </View>
+                            <View style={styles.miniStat}>
+                                <Text style={styles.miniStatLabel}>PLANES DESTROYED</Text>
+                                <Text style={styles.miniStatValue}>{totalPlanesDestroyed}</Text>
+                            </View>
+                        </View>
+
+                        <TouchableOpacity style={styles.editIconBtn} onPress={() => { setTempName(username); setIsEditingName(true); }}>
+                            <Text style={styles.editIconText}>âœŽ</Text>
                         </TouchableOpacity>
+                    </View>
+
+                    <TouchableOpacity style={styles.button} onPress={startGame}>
+                        <View style={styles.btnContent}>
+                            <Text style={styles.btnIcon}>âœˆï¸</Text>
+                            <Text style={styles.buttonText}>START MISSION</Text>
+                        </View>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity style={[styles.button, { opacity: 0.5 }]} disabled>
+                        <View style={styles.btnContent}>
+                            <Text style={styles.btnIcon}>ðŸŒ</Text>
+                            <Text style={styles.buttonText}>MULTIPLAYER (SOON)</Text>
+                        </View>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity style={[styles.button, { backgroundColor: '#1E1E2E' }]} onPress={() => setShowLeaderboard(true)}>
+                        <View style={styles.btnContent}>
+                            <Text style={styles.btnIcon}>ðŸ“Š</Text>
+                            <Text style={styles.buttonText}>LEADERBOARD</Text>
+                        </View>
+                    </TouchableOpacity>
+                </View>
+            )}
+
+            {gameState === 'SETUP' && (
+                <View style={styles.gameContainer}>
+                    <View style={{ alignItems: 'center', marginBottom: 20 }}>
+                        <Text style={styles.header}>PLACE YOUR FLEET ({playerPlanes.length}/3)</Text>
                         <TouchableOpacity
-                            style={[styles.button, { backgroundColor: '#333', marginTop: 20 }]}
-                            onPress={() => setGameState('LOBBY')}
+                            style={[styles.undoButton, { marginTop: 10, opacity: playerPlanes.length > 0 ? 1 : 0.4 }]}
+                            onPress={undoPlacement}
+                            disabled={playerPlanes.length === 0 || isFlying}
                         >
-                            <Text style={styles.buttonText}>PLAY AS GUEST</Text>
+                            <Text style={styles.undoText}>â†© UNDO LAST PLANE</Text>
                         </TouchableOpacity>
                     </View>
-                )}
-
-                {gameState === 'LOBBY' && (
-                    <View style={styles.center}>
-                        <View style={styles.profileBadge}>
-                            <Text style={styles.pilotRank}>ADMIRAL</Text>
-                            <Text style={styles.pilotName}>
-                                {username.length > 20 ? `${username.slice(0, 4)}...${username.slice(-4)}` : username}
-                            </Text>
-
-                            <View style={styles.badgeLine} />
-
-                            <View style={styles.miniStatsRow}>
-                                <View style={styles.miniStat}>
-                                    <Text style={styles.miniStatLabel}>BATTLES WON</Text>
-                                    <Text style={styles.miniStatValue}>{playerWins}</Text>
-                                </View>
-                                <View style={styles.miniStat}>
-                                    <Text style={styles.miniStatLabel}>PLANES DESTROYED</Text>
-                                    <Text style={styles.miniStatValue}>{totalPlanesDestroyed}</Text>
-                                </View>
-                            </View>
-
-                            <TouchableOpacity style={styles.editIconBtn} onPress={() => { setTempName(username); setIsEditingName(true); }}>
-                                <Text style={styles.editIconText}>✎</Text>
-                            </TouchableOpacity>
-                        </View>
-
-                        <TouchableOpacity style={styles.button} onPress={startGame}>
-                            <View style={styles.btnContent}>
-                                <Text style={styles.btnIcon}>✈️</Text>
-                                <Text style={styles.buttonText}>START MISSION</Text>
-                            </View>
-                        </TouchableOpacity>
-
-                        <TouchableOpacity style={[styles.button, { opacity: 0.5 }]} disabled>
-                            <View style={styles.btnContent}>
-                                <Text style={styles.btnIcon}>🌐</Text>
-                                <Text style={styles.buttonText}>MULTIPLAYER (SOON)</Text>
-                            </View>
-                        </TouchableOpacity>
-
-                        <TouchableOpacity style={[styles.button, { backgroundColor: '#1E1E2E' }]} onPress={() => setShowLeaderboard(true)}>
-                            <View style={styles.btnContent}>
-                                <Text style={styles.btnIcon}>📊</Text>
-                                <Text style={styles.buttonText}>LEADERBOARD</Text>
-                            </View>
-                        </TouchableOpacity>
+                    <View
+                        ref={gridRef}
+                        collapsable={false}
+                        onLayout={updateGridPos}
+                        style={{ padding: 2, backgroundColor: dragPreview ? '#1a1a2e' : 'transparent', borderRadius: 5 }}
+                    >
+                        <Grid
+                            grid={playerGrid}
+                            active={false}
+                            onCellPress={() => { }}
+                            showPlanes={true}
+                            previewCells={dragPreview ? Game.getPlaneCells(dragPreview, setupOrientation) : undefined}
+                            isValidPreview={dragPreview ? Game.isValidPlacement(playerPlanes, Game.getPlaneCells(dragPreview, setupOrientation)) : undefined}
+                            cellSize={CELL_SIZE}
+                        />
                     </View>
-                )}
 
-                {gameState === 'SETUP' && (
-                    <View style={styles.gameContainer}>
-                        <View style={{ alignItems: 'center', marginBottom: 20 }}>
-                            <Text style={styles.header}>PLACE YOUR FLEET ({playerPlanes.length}/3)</Text>
-                            <TouchableOpacity
-                                style={[styles.undoButton, { marginTop: 10, opacity: playerPlanes.length > 0 ? 1 : 0.4 }]}
-                                onPress={undoPlacement}
-                                disabled={playerPlanes.length === 0 || isFlying}
-                            >
-                                <Text style={styles.undoText}>↩ UNDO LAST PLANE</Text>
-                            </TouchableOpacity>
+                    {playerPlanes.length < Game.PLANE_COUNT && !isFlying && (
+                        <View style={styles.dock}>
+                            <Text style={styles.dockText}>DRAG PLANE TO GRID</Text>
+                            <View style={styles.dockPlaneRow}>
+                                <TouchableOpacity onPress={rotateLeft} style={styles.arrowButton}>
+                                    <Text style={styles.arrowText}>â—€</Text>
+                                </TouchableOpacity>
+
+                                <View {...panResponder.panHandlers} style={[styles.planePreviewContainer, { width: CELL_SIZE * 3, height: CELL_SIZE * 3 }]}>
+                                    <PlaneVisual cellSize={CELL_SIZE * 0.5} orientation={setupOrientation} />
+                                </View>
+
+                                <TouchableOpacity onPress={rotateRight} style={styles.arrowButton}>
+                                    <Text style={styles.arrowText}>â–¶</Text>
+                                </TouchableOpacity>
+                            </View>
+                            <Text style={styles.orientationText}>ORIENTATION: {setupOrientation}</Text>
                         </View>
-                        <View
-                            ref={gridRef}
-                            collapsable={false}
-                            onLayout={updateGridPos}
-                            style={{ padding: 2, backgroundColor: dragPreview ? '#1a1a2e' : 'transparent', borderRadius: 5 }}
-                        >
+                    )}
+                    {(playerPlanes.length >= Game.PLANE_COUNT || isFlying) && (
+                        <View style={[styles.dock, { opacity: 0.5 }]}>
+                            <Text style={styles.dockText}>{isFlying ? "DEPLOYING..." : "FLEET READY!"}</Text>
+                        </View>
+                    )}
+                </View>
+            )}
+
+            {gameState === 'PLAY' && (
+                <ScrollView contentContainerStyle={styles.scrollContent}>
+                    <View style={styles.section}>
+                        <Text style={[styles.header, { fontSize: 16, color: '#f00' }]}>ENEMY SECTOR</Text>
+                        <View>
+                            <Grid
+                                grid={computerGrid}
+                                active={turn === 'PLAYER'}
+                                onCellPress={handleAttack}
+                                showPlanes={false}
+                                cellSize={CELL_SIZE}
+                            />
+                            {!!battleMsg && (battleMsg.startsWith('YOU') || battleMsg === 'VICTORY!') && (
+                                <View style={styles.overlay} pointerEvents="none">
+                                    <View style={styles.msgBadge}>
+                                        <Text style={styles.msgText}>{battleMsg}</Text>
+                                    </View>
+                                </View>
+                            )}
+                        </View>
+                    </View>
+
+                    <View style={styles.scoreBoard}>
+                        <Text style={styles.scoreLabel}>PLAYER </Text>
+                        <Text style={styles.scoreValue}>{playerScore}</Text>
+                        <Text style={styles.scoreVs}>  VS  </Text>
+                        <Text style={styles.scoreValue}>{computerScore}</Text>
+                        <Text style={styles.scoreLabel}> ENEMY</Text>
+                    </View>
+
+                    <View style={styles.section}>
+                        <Text style={[styles.header, { fontSize: 16, color: '#0f0' }]}>YOUR FLEET</Text>
+                        <View>
                             <Grid
                                 grid={playerGrid}
                                 active={false}
                                 onCellPress={() => { }}
                                 showPlanes={true}
-                                previewCells={dragPreview ? Game.getPlaneCells(dragPreview, setupOrientation) : undefined}
-                                isValidPreview={dragPreview ? Game.isValidPlacement(playerPlanes, Game.getPlaneCells(dragPreview, setupOrientation)) : undefined}
                                 cellSize={CELL_SIZE}
                             />
-                        </View>
-
-                        {playerPlanes.length < Game.PLANE_COUNT && !isFlying && (
-                            <View style={styles.dock}>
-                                <Text style={styles.dockText}>DRAG PLANE TO GRID</Text>
-                                <View style={styles.dockPlaneRow}>
-                                    <TouchableOpacity onPress={rotateLeft} style={styles.arrowButton}>
-                                        <Text style={styles.arrowText}>◀</Text>
-                                    </TouchableOpacity>
-
-                                    <View {...panResponder.panHandlers} style={[styles.planePreviewContainer, { width: CELL_SIZE * 3, height: CELL_SIZE * 3 }]}>
-                                        <PlaneVisual cellSize={CELL_SIZE * 0.5} orientation={setupOrientation} />
+                            {!!battleMsg && (battleMsg.startsWith('ENEMY') || battleMsg === 'DEFEAT!') && (
+                                <View style={styles.overlay} pointerEvents="none">
+                                    <View style={styles.msgBadge}>
+                                        <Text style={styles.msgText}>{battleMsg}</Text>
                                     </View>
-
-                                    <TouchableOpacity onPress={rotateRight} style={styles.arrowButton}>
-                                        <Text style={styles.arrowText}>▶</Text>
-                                    </TouchableOpacity>
                                 </View>
-                                <Text style={styles.orientationText}>ORIENTATION: {setupOrientation}</Text>
-                            </View>
-                        )}
-                        {(playerPlanes.length >= Game.PLANE_COUNT || isFlying) && (
-                            <View style={[styles.dock, { opacity: 0.5 }]}>
-                                <Text style={styles.dockText}>{isFlying ? "DEPLOYING..." : "FLEET READY!"}</Text>
-                            </View>
-                        )}
+                            )}
+                        </View>
+                        <Animated.View style={[
+                            styles.turnIndicator,
+                            turn === 'PLAYER' && {
+                                backgroundColor: turnPulseAnim.interpolate({
+                                    inputRange: [0, 1],
+                                    outputRange: ['rgba(0,0,0,0.8)', 'rgba(0, 255, 100, 0.4)']
+                                }),
+                                borderColor: turnPulseAnim.interpolate({
+                                    inputRange: [0, 1],
+                                    outputRange: ['#fff', '#0f0']
+                                })
+                            }
+                        ]}>
+                            <Text style={styles.turnText}>{turn === 'PLAYER' ? "YOUR TURN" : "ENEMY ATTACKING..."}</Text>
+                        </Animated.View>
                     </View>
-                )}
+                </ScrollView>
+            )}
 
-                {gameState === 'PLAY' && (
-                    <ScrollView contentContainerStyle={styles.scrollContent}>
-                        <View style={styles.section}>
-                            <Text style={[styles.header, { fontSize: 16, color: '#f00' }]}>ENEMY SECTOR</Text>
-                            <View>
+            {gameState === 'GAME_OVER' && (
+                <View style={styles.center}>
+                    {!showRecap ? (
+                        <View style={styles.center}>
+                            <Text style={[styles.title, { fontSize: 40, color: winner === 'PLAYER' ? '#0f0' : '#f00' }]}>
+                                {winner === 'PLAYER' ? "VICTORY" : "DEFEAT"}
+                            </Text>
+                            <View style={{ height: 20 }} />
+                            <TouchableOpacity style={styles.button} onPress={() => setGameState('LOBBY')}>
+                                <Text style={styles.buttonText}>RETURNING TO BASE</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={[styles.button, { backgroundColor: '#1E1E2E' }]}
+                                onPress={() => setShowRecap(true)}
+                            >
+                                <View style={styles.btnContent}>
+                                    <Text style={styles.btnIcon}>ðŸ—ºï¸</Text>
+                                    <Text style={styles.buttonText}>REVIEW BATTLEFIELD</Text>
+                                </View>
+                            </TouchableOpacity>
+                        </View>
+                    ) : (
+                        <ScrollView contentContainerStyle={styles.scrollContent}>
+                            <View style={styles.section}>
+                                <Text style={[styles.header, { fontSize: 16, color: '#f00' }]}>ENEMY SECTOR (REVEALED)</Text>
                                 <Grid
                                     grid={computerGrid}
-                                    active={turn === 'PLAYER'}
-                                    onCellPress={handleAttack}
-                                    showPlanes={false}
+                                    active={false}
+                                    onCellPress={() => { }}
+                                    showPlanes={true}
                                     cellSize={CELL_SIZE}
                                 />
-                                {!!battleMsg && (battleMsg.startsWith('YOU') || battleMsg === 'VICTORY!') && (
-                                    <View style={styles.overlay} pointerEvents="none">
-                                        <View style={styles.msgBadge}>
-                                            <Text style={styles.msgText}>{battleMsg}</Text>
-                                        </View>
-                                    </View>
-                                )}
                             </View>
-                        </View>
 
-                        <View style={styles.scoreBoard}>
-                            <Text style={styles.scoreLabel}>PLAYER </Text>
-                            <Text style={styles.scoreValue}>{playerScore}</Text>
-                            <Text style={styles.scoreVs}>  VS  </Text>
-                            <Text style={styles.scoreValue}>{computerScore}</Text>
-                            <Text style={styles.scoreLabel}> ENEMY</Text>
-                        </View>
 
-                        <View style={styles.section}>
-                            <Text style={[styles.header, { fontSize: 16, color: '#0f0' }]}>YOUR FLEET</Text>
-                            <View>
+                            {/* Mission Stats Dashboard */}
+                            <View style={styles.missionStatsContainer}>
+                                <View style={styles.missionStatsCol}>
+                                    <Text style={styles.statsColTitle}>PILOT (YOU)</Text>
+                                    <View style={styles.missionStatRow}>
+                                        <Text style={styles.missionStatLabel}>TOTAL HITS</Text>
+                                        <Text style={[styles.missionStatValue, { color: '#0f0' }]}>{pHits}</Text>
+                                    </View>
+                                    <View style={styles.missionStatRow}>
+                                        <Text style={styles.missionStatLabel}>TOTAL MISSES</Text>
+                                        <Text style={[styles.missionStatValue, { color: '#f00' }]}>{pMisses}</Text>
+                                    </View>
+                                    <View style={styles.missionStatRow}>
+                                        <Text style={styles.missionStatLabel}>PLANES KILLED</Text>
+                                        <Text style={styles.missionStatValue}>{playerScore}</Text>
+                                    </View>
+                                </View>
+
+                                <View style={styles.missionStatsDivider} />
+
+                                <View style={styles.missionStatsCol}>
+                                    <Text style={styles.statsColTitle}>ENEMY AI</Text>
+                                    <View style={styles.missionStatRow}>
+                                        <Text style={styles.missionStatLabel}>TOTAL HITS</Text>
+                                        <Text style={[styles.missionStatValue, { color: '#0f0' }]}>{cHits}</Text>
+                                    </View>
+                                    <View style={styles.missionStatRow}>
+                                        <Text style={styles.missionStatLabel}>TOTAL MISSES</Text>
+                                        <Text style={[styles.missionStatValue, { color: '#f00' }]}>{cMisses}</Text>
+                                    </View>
+                                    <View style={styles.missionStatRow}>
+                                        <Text style={styles.missionStatLabel}>PLANES KILLED</Text>
+                                        <Text style={styles.missionStatValue}>{computerScore}</Text>
+                                    </View>
+                                </View>
+                            </View>
+
+                            <View style={styles.section}>
+                                <Text style={[styles.header, { fontSize: 16, color: '#0f0' }]}>YOUR FLEET</Text>
                                 <Grid
                                     grid={playerGrid}
                                     active={false}
@@ -759,264 +798,156 @@ export default function App() {
                                     showPlanes={true}
                                     cellSize={CELL_SIZE}
                                 />
-                                {!!battleMsg && (battleMsg.startsWith('ENEMY') || battleMsg === 'DEFEAT!') && (
-                                    <View style={styles.overlay} pointerEvents="none">
-                                        <View style={styles.msgBadge}>
-                                            <Text style={styles.msgText}>{battleMsg}</Text>
-                                        </View>
-                                    </View>
-                                )}
                             </View>
-                            <Animated.View style={[
-                                styles.turnIndicator,
-                                turn === 'PLAYER' && {
-                                    backgroundColor: turnPulseAnim.interpolate({
-                                        inputRange: [0, 1],
-                                        outputRange: ['rgba(0,0,0,0.8)', 'rgba(0, 255, 100, 0.4)']
-                                    }),
-                                    borderColor: turnPulseAnim.interpolate({
-                                        inputRange: [0, 1],
-                                        outputRange: ['#fff', '#0f0']
-                                    })
-                                }
-                            ]}>
-                                <Text style={styles.turnText}>{turn === 'PLAYER' ? "YOUR TURN" : "ENEMY ATTACKING..."}</Text>
-                            </Animated.View>
-                        </View>
-                    </ScrollView>
-                )}
 
-                {gameState === 'GAME_OVER' && (
-                    <View style={styles.center}>
-                        {!showRecap ? (
-                            <View style={styles.center}>
-                                <Text style={[styles.title, { fontSize: 40, color: winner === 'PLAYER' ? '#0f0' : '#f00' }]}>
-                                    {winner === 'PLAYER' ? "VICTORY" : "DEFEAT"}
-                                </Text>
-                                <View style={{ height: 20 }} />
-                                <TouchableOpacity style={styles.button} onPress={() => setGameState('LOBBY')}>
-                                    <Text style={styles.buttonText}>RETURNING TO BASE</Text>
-                                </TouchableOpacity>
-                                <TouchableOpacity
-                                    style={[styles.button, { backgroundColor: '#1E1E2E' }]}
-                                    onPress={() => setShowRecap(true)}
-                                >
-                                    <View style={styles.btnContent}>
-                                        <Text style={styles.btnIcon}>🗺️</Text>
-                                        <Text style={styles.buttonText}>REVIEW BATTLEFIELD</Text>
-                                    </View>
-                                </TouchableOpacity>
-                            </View>
-                        ) : (
-                            <ScrollView contentContainerStyle={styles.scrollContent}>
-                                <View style={styles.section}>
-                                    <Text style={[styles.header, { fontSize: 16, color: '#f00' }]}>ENEMY SECTOR (REVEALED)</Text>
-                                    <Grid
-                                        grid={computerGrid}
-                                        active={false}
-                                        onCellPress={() => { }}
-                                        showPlanes={true}
-                                        cellSize={CELL_SIZE}
-                                    />
-                                </View>
-
-
-                                {/* Mission Stats Dashboard */}
-                                <View style={styles.missionStatsContainer}>
-                                    <View style={styles.missionStatsCol}>
-                                        <Text style={styles.statsColTitle}>PILOT (YOU)</Text>
-                                        <View style={styles.missionStatRow}>
-                                            <Text style={styles.missionStatLabel}>TOTAL HITS</Text>
-                                            <Text style={[styles.missionStatValue, { color: '#0f0' }]}>{pHits}</Text>
-                                        </View>
-                                        <View style={styles.missionStatRow}>
-                                            <Text style={styles.missionStatLabel}>TOTAL MISSES</Text>
-                                            <Text style={[styles.missionStatValue, { color: '#f00' }]}>{pMisses}</Text>
-                                        </View>
-                                        <View style={styles.missionStatRow}>
-                                            <Text style={styles.missionStatLabel}>PLANES KILLED</Text>
-                                            <Text style={styles.missionStatValue}>{playerScore}</Text>
-                                        </View>
-                                    </View>
-
-                                    <View style={styles.missionStatsDivider} />
-
-                                    <View style={styles.missionStatsCol}>
-                                        <Text style={styles.statsColTitle}>ENEMY AI</Text>
-                                        <View style={styles.missionStatRow}>
-                                            <Text style={styles.missionStatLabel}>TOTAL HITS</Text>
-                                            <Text style={[styles.missionStatValue, { color: '#0f0' }]}>{cHits}</Text>
-                                        </View>
-                                        <View style={styles.missionStatRow}>
-                                            <Text style={styles.missionStatLabel}>TOTAL MISSES</Text>
-                                            <Text style={[styles.missionStatValue, { color: '#f00' }]}>{cMisses}</Text>
-                                        </View>
-                                        <View style={styles.missionStatRow}>
-                                            <Text style={styles.missionStatLabel}>PLANES KILLED</Text>
-                                            <Text style={styles.missionStatValue}>{computerScore}</Text>
-                                        </View>
-                                    </View>
-                                </View>
-
-                                <View style={styles.section}>
-                                    <Text style={[styles.header, { fontSize: 16, color: '#0f0' }]}>YOUR FLEET</Text>
-                                    <Grid
-                                        grid={playerGrid}
-                                        active={false}
-                                        onCellPress={() => { }}
-                                        showPlanes={true}
-                                        cellSize={CELL_SIZE}
-                                    />
-                                </View>
-
-                                <TouchableOpacity
-                                    style={[styles.button, { alignSelf: 'center', marginTop: 20 }]}
-                                    onPress={() => setShowRecap(false)}
-                                >
-                                    <Text style={styles.buttonText}>BACK TO SUMMARY</Text>
-                                </TouchableOpacity>
-                                <View style={{ height: 40 }} />
-                            </ScrollView>
-                        )}
-                    </View>
-                )}
-
-                {(dragPos || isFlying) && (
-                    <View style={StyleSheet.absoluteFill} pointerEvents="none">
-                        {dragPos && (
-                            <View
-                                style={[
-                                    styles.dragFollower,
-                                    {
-                                        left: dragPos.x - getOffsets(setupOrientation, CELL_SIZE).x,
-                                        top: dragPos.y - getOffsets(setupOrientation, CELL_SIZE).y
-                                    }
-                                ]}
-                            >
-                                <PlaneVisual cellSize={CELL_SIZE} orientation={setupOrientation} opacity={0.7} />
-                            </View>
-                        )}
-
-                        {isFlying && (
-                            <Animated.View
-                                style={[
-                                    styles.dragFollower,
-                                    {
-                                        left: Animated.subtract(flyAnim.x, getOffsets(flyOrientation, CELL_SIZE).x),
-                                        top: Animated.subtract(flyAnim.y, getOffsets(flyOrientation, CELL_SIZE).y),
-                                    }
-                                ]}
-                            >
-                                <PlaneVisual cellSize={CELL_SIZE} orientation={flyOrientation} />
-                            </Animated.View>
-                        )}
-                    </View>
-                )}
-
-                {/* Name Editor Modal */}
-                <Modal visible={isEditingName} transparent animationType="fade">
-                    <View style={styles.modalBg}>
-                        <View style={styles.modalContent}>
-                            <Text style={styles.modalTitle}>IDENTIFICATION</Text>
-                            <TextInput
-                                style={styles.input}
-                                value={tempName}
-                                onChangeText={setTempName}
-                                placeholder="ENTER CALLSIGN"
-                                placeholderTextColor="#555"
-                                autoFocus
-                                maxLength={45}
-                            />
-                            {walletAddress && (
-                                <TouchableOpacity
-                                    style={[styles.modalButton, { backgroundColor: '#333', marginBottom: 10, borderWidth: 1, borderColor: '#555' }]}
-                                    onPress={() => setTempName(walletAddress)}
-                                >
-                                    <Text style={styles.buttonText}>USE WALLET ADDRESS</Text>
-                                </TouchableOpacity>
-                            )}
-                            <View style={styles.modalButtons}>
-                                <TouchableOpacity
-                                    style={[styles.smallButton, { backgroundColor: '#333' }]}
-                                    onPress={() => setIsEditingName(false)}
-                                >
-                                    <Text style={styles.smallButtonText}>CANCEL</Text>
-                                </TouchableOpacity>
-                                <TouchableOpacity
-                                    style={[styles.smallButton, { backgroundColor: '#6C5CE7' }]}
-                                    onPress={() => {
-                                        const newName = tempName || username;
-                                        setUsername(newName);
-                                        // @ts-ignore
-                                        submitScore(newName, playerWins, totalPlanesDestroyed, walletAddress);
-                                        setIsEditingName(false);
-                                    }}
-                                >
-                                    <Text style={styles.smallButtonText}>CONFIRM</Text>
-                                </TouchableOpacity>
-                            </View>
-                        </View>
-                    </View>
-                </Modal>
-
-                {/* Leaderboard Modal */}
-                <Modal visible={showLeaderboard} transparent animationType="slide">
-                    <View style={styles.modalBg}>
-                        <View style={[styles.modalContent, { height: '60%', width: '90%' }]}>
-                            <Text style={styles.modalTitle}>LEADERBOARD</Text>
-                            <ScrollView style={{ width: '100%' }}>
-                                {leaderboard.map((ace, i) => (
-                                    <View key={i} style={[styles.leaderRow, ace.username === username && styles.leaderRowLive]}>
-                                        <View style={styles.rankContainer}>
-                                            {i === 0 ? <Text style={styles.medal}>🥇</Text> :
-                                                i === 1 ? <Text style={styles.medal}>🥈</Text> :
-                                                    i === 2 ? <Text style={styles.medal}>🥉</Text> :
-                                                        <Text style={styles.leaderRank}>#{i + 1}</Text>}
-                                        </View>
-                                        <Text style={[styles.leaderName, ace.username === username && { color: '#6C5CE7' }]}>
-                                            {ace.username.length > 20 ? `${ace.username.slice(0, 4)}...${ace.username.slice(-4)}` : ace.username}
-                                        </Text>
-                                        <View style={styles.leaderStats}>
-                                            <View style={styles.statBox}>
-                                                <Text style={styles.statValueMini}>{ace.wins}</Text>
-                                                <Text style={styles.statLabelMini}>WINS</Text>
-                                            </View>
-                                            <View style={styles.statBox}>
-                                                <Text style={[styles.statValueMini, { color: '#0f0' }]}>{ace.kills}</Text>
-                                                <Text style={styles.statLabelMini}>KILLS</Text>
-                                            </View>
-                                        </View>
-                                    </View>
-                                ))}
-                                {leaderboard.length === 0 && (
-                                    <View style={{ marginTop: 40, alignItems: 'center' }}>
-                                        <Text style={{ color: '#555', textAlign: 'center' }}>
-                                            {serverStatus === 'LOADING' ? 'CONNECTING TO BASE...' :
-                                                serverStatus === 'ERROR' ? 'COMMUNICATION ERROR' : 'NO DATA RECORDED'}
-                                        </Text>
-                                        {(serverStatus === 'ERROR' || serverStatus === 'IDLE') && (
-                                            <TouchableOpacity
-                                                style={[styles.smallButton, { marginTop: 20, borderColor: '#6C5CE7' }]}
-                                                onPress={fetchLeaderboard}
-                                            >
-                                                <Text style={styles.smallButtonText}>RETRY CONNECTION</Text>
-                                            </TouchableOpacity>
-                                        )}
-                                    </View>
-                                )}
-                            </ScrollView>
                             <TouchableOpacity
-                                style={[styles.button, { width: '100%', marginTop: 20 }]}
-                                onPress={() => setShowLeaderboard(false)}
+                                style={[styles.button, { alignSelf: 'center', marginTop: 20 }]}
+                                onPress={() => setShowRecap(false)}
                             >
-                                <Text style={styles.buttonText}>CLOSE</Text>
+                                <Text style={styles.buttonText}>BACK TO SUMMARY</Text>
+                            </TouchableOpacity>
+                            <View style={{ height: 40 }} />
+                        </ScrollView>
+                    )}
+                </View>
+            )}
+
+            {(dragPos || isFlying) && (
+                <View style={StyleSheet.absoluteFill} pointerEvents="none">
+                    {dragPos && (
+                        <View
+                            style={[
+                                styles.dragFollower,
+                                {
+                                    left: dragPos.x - getOffsets(setupOrientation, CELL_SIZE).x,
+                                    top: dragPos.y - getOffsets(setupOrientation, CELL_SIZE).y
+                                }
+                            ]}
+                        >
+                            <PlaneVisual cellSize={CELL_SIZE} orientation={setupOrientation} opacity={0.7} />
+                        </View>
+                    )}
+
+                    {isFlying && (
+                        <Animated.View
+                            style={[
+                                styles.dragFollower,
+                                {
+                                    left: Animated.subtract(flyAnim.x, getOffsets(flyOrientation, CELL_SIZE).x),
+                                    top: Animated.subtract(flyAnim.y, getOffsets(flyOrientation, CELL_SIZE).y),
+                                }
+                            ]}
+                        >
+                            <PlaneVisual cellSize={CELL_SIZE} orientation={flyOrientation} />
+                        </Animated.View>
+                    )}
+                </View>
+            )}
+
+            {/* Name Editor Modal */}
+            <Modal visible={isEditingName} transparent animationType="fade">
+                <View style={styles.modalBg}>
+                    <View style={styles.modalContent}>
+                        <Text style={styles.modalTitle}>IDENTIFICATION</Text>
+                        <TextInput
+                            style={styles.input}
+                            value={tempName}
+                            onChangeText={setTempName}
+                            placeholder="ENTER CALLSIGN"
+                            placeholderTextColor="#555"
+                            autoFocus
+                            maxLength={45}
+                        />
+                        {walletAddress && (
+                            <TouchableOpacity
+                                style={[styles.modalButton, { backgroundColor: '#333', marginBottom: 10, borderWidth: 1, borderColor: '#555' }]}
+                                onPress={() => setTempName(walletAddress)}
+                            >
+                                <Text style={styles.buttonText}>USE WALLET ADDRESS</Text>
+                            </TouchableOpacity>
+                        )}
+                        <View style={styles.modalButtons}>
+                            <TouchableOpacity
+                                style={[styles.smallButton, { backgroundColor: '#333' }]}
+                                onPress={() => setIsEditingName(false)}
+                            >
+                                <Text style={styles.smallButtonText}>CANCEL</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={[styles.smallButton, { backgroundColor: '#6C5CE7' }]}
+                                onPress={() => {
+                                    const newName = tempName || username;
+                                    setUsername(newName);
+                                    // @ts-ignore
+                                    submitScore(newName, playerWins, totalPlanesDestroyed, walletAddress);
+                                    setIsEditingName(false);
+                                }}
+                            >
+                                <Text style={styles.smallButtonText}>CONFIRM</Text>
                             </TouchableOpacity>
                         </View>
                     </View>
-                </Modal>
-            </SafeAreaView>
-        </SafeAreaProvider >
-    );
+                </View>
+            </Modal>
+
+            {/* Leaderboard Modal */}
+            <Modal visible={showLeaderboard} transparent animationType="slide">
+                <View style={styles.modalBg}>
+                    <View style={[styles.modalContent, { height: '60%', width: '90%' }]}>
+                        <Text style={styles.modalTitle}>LEADERBOARD</Text>
+                        <ScrollView style={{ width: '100%' }}>
+                            {leaderboard.map((ace, i) => (
+                                <View key={i} style={[styles.leaderRow, ace.username === username && styles.leaderRowLive]}>
+                                    <View style={styles.rankContainer}>
+                                        {i === 0 ? <Text style={styles.medal}>ðŸ¥‡</Text> :
+                                            i === 1 ? <Text style={styles.medal}>ðŸ¥ˆ</Text> :
+                                                i === 2 ? <Text style={styles.medal}>ðŸ¥‰</Text> :
+                                                    <Text style={styles.leaderRank}>#{i + 1}</Text>}
+                                    </View>
+                                    <Text style={[styles.leaderName, ace.username === username && { color: '#6C5CE7' }]}>
+                                        {ace.username.length > 20 ? `${ace.username.slice(0, 4)}...${ace.username.slice(-4)}` : ace.username}
+                                    </Text>
+                                    <View style={styles.leaderStats}>
+                                        <View style={styles.statBox}>
+                                            <Text style={styles.statValueMini}>{ace.wins}</Text>
+                                            <Text style={styles.statLabelMini}>WINS</Text>
+                                        </View>
+                                        <View style={styles.statBox}>
+                                            <Text style={[styles.statValueMini, { color: '#0f0' }]}>{ace.kills}</Text>
+                                            <Text style={styles.statLabelMini}>KILLS</Text>
+                                        </View>
+                                    </View>
+                                </View>
+                            ))}
+                            {leaderboard.length === 0 && (
+                                <View style={{ marginTop: 40, alignItems: 'center' }}>
+                                    <Text style={{ color: '#555', textAlign: 'center' }}>
+                                        {serverStatus === 'LOADING' ? 'CONNECTING TO BASE...' :
+                                            serverStatus === 'ERROR' ? 'COMMUNICATION ERROR' : 'NO DATA RECORDED'}
+                                    </Text>
+                                    {(serverStatus === 'ERROR' || serverStatus === 'IDLE') && (
+                                        <TouchableOpacity
+                                            style={[styles.smallButton, { marginTop: 20, borderColor: '#6C5CE7' }]}
+                                            onPress={fetchLeaderboard}
+                                        >
+                                            <Text style={styles.smallButtonText}>RETRY CONNECTION</Text>
+                                        </TouchableOpacity>
+                                    )}
+                                </View>
+                            )}
+                        </ScrollView>
+                        <TouchableOpacity
+                            style={[styles.button, { width: '100%', marginTop: 20 }]}
+                            onPress={() => setShowLeaderboard(false)}
+                        >
+                            <Text style={styles.buttonText}>CLOSE</Text>
+                        </TouchableOpacity>
+                    </View>
+                </View>
+            </Modal>
+        </SafeAreaView>
+    </SafeAreaProvider >
+);
 }
 
 const styles = StyleSheet.create({

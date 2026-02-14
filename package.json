@@ -11,9 +11,6 @@
   "dependencies": {
     "@craftzdog/react-native-buffer": "^6.1.1",
     "@expo/metro-config": "~54.0.14",
-    "@react-native-async-storage/async-storage": "^2.2.0",
-    "@solana-mobile/mobile-wallet-adapter-protocol": "^2.2.5",
-    "@solana-mobile/mobile-wallet-adapter-protocol-web3js": "^2.2.5",
     "@solana/web3.js": "^1.98.4",
     "buffer": "^6.0.3",
     "expo": "~54.0.33",
