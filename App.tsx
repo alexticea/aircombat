@@ -419,11 +419,12 @@ export default function App() {
         }
     }, [gameState]);
 
-    // Handle Deep Links
     useEffect(() => {
         const handleUrl = (url: string | null) => {
             if (!url) return;
             console.log("[App] Deep link received:", url);
+
+            // 1. Handle Connect Callback
             const result = SolanaLogin.handleConnectCallback(url);
             if (result) {
                 const address = result.publicKey.toBase58();
@@ -442,7 +443,26 @@ export default function App() {
                     }
                 })();
 
-                Alert.alert("Success", "Connected to Solflare!");
+                // Now automatically trigger Sign Message for "Login" verification
+                const signRedirect = Linking.createURL('solflare-sign');
+                try {
+                    const signUrl = SolanaLogin.buildSignMessageUrl("Welcome to Air Combat! Sign to authenticate.", signRedirect);
+                    setTimeout(() => {
+                        Linking.openURL(signUrl);
+                    }, 800);
+                } catch (e) {
+                    console.error("Failed to build sign URL", e);
+                    Alert.alert("Notice", "Connected to Solflare. Automated sign-in failed.");
+                    setGameState('LOBBY');
+                    fetchLeaderboard();
+                }
+            }
+
+            // 2. Handle Sign Message Callback
+            const signResult = SolanaLogin.handleSignMessageCallback(url);
+            if (signResult) {
+                console.log("[App] Signature verified:", signResult.signature);
+                Alert.alert("Pilot Verified", "Authentication successful.");
                 setGameState('LOBBY');
                 fetchLeaderboard();
             }
@@ -492,6 +512,17 @@ export default function App() {
                 await provider.connect();
                 const publicKey = provider.publicKey;
                 const address = publicKey.toString();
+
+                // Sign welcome message
+                try {
+                    const message = "Welcome to Air Combat! Sign to authenticate.";
+                    const encodedMessage = new TextEncoder().encode(message);
+                    await provider.signMessage(encodedMessage, "utf8");
+                    console.log("[Web] Message signed");
+                } catch (signErr) {
+                    console.warn("[Web] Signature rejected", signErr);
+                    // We'll allow them in for now but in prod we might block
+                }
 
                 setUsername(address);
                 setWalletAddress(address);
