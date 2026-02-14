@@ -445,11 +445,22 @@ export default function App() {
 
                 // Now automatically trigger Sign Message for "Login" verification
                 const signRedirect = Linking.createURL('solflare-sign');
+                console.log("[App] Preparing SignMessage redirect:", signRedirect);
                 try {
                     const signUrl = SolanaLogin.buildSignMessageUrl("Welcome to Air Combat! Sign to authenticate.", signRedirect);
-                    setTimeout(() => {
-                        Linking.openURL(signUrl);
-                    }, 800);
+                    console.log("[App] Opening SignMessage URL in Solflare...");
+
+                    // Alert user so they know why Solflare is opening again
+                    Alert.alert("Verification Required", "Please sign the welcome message in Solflare to verify your pilot identity.", [
+                        {
+                            text: "PROCEED",
+                            onPress: () => {
+                                setTimeout(() => {
+                                    Linking.openURL(signUrl).catch(err => console.error("[App] Linking error:", err));
+                                }, 500);
+                            }
+                        }
+                    ]);
                 } catch (e) {
                     console.error("Failed to build sign URL", e);
                     Alert.alert("Notice", "Connected to Solflare. Automated sign-in failed.");

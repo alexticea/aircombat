@@ -66,6 +66,7 @@ export const handleConnectCallback = (url: string): { publicKey: PublicKey, sess
     if (!sessionState) return null;
 
     const parsed = Linking.parse(url);
+    console.log("[SolanaLogin] Parsed path:", parsed.path);
     // Explicitly check path to avoid cross-fire with signMessage callback
     if (parsed.path !== 'solflare-login') return null;
 
@@ -142,6 +143,7 @@ export const handleSignMessageCallback = (url: string): { signature: string } | 
     if (!sessionState || !sessionState.sharedSecret) return null;
 
     const parsed = Linking.parse(url);
+    console.log("[SolanaLogin] Sign path:", parsed.path);
     if (parsed.path !== 'solflare-sign') return null;
 
     const queryParams = parsed.queryParams;
