@@ -489,6 +489,25 @@ export default function App() {
         }
     };
 
+    const handleDisconnect = async () => {
+        setWalletAddress(null);
+        setBalance(null);
+        setGameState('LOGIN');
+        // If web, disconnect from provider
+        if (Platform.OS === 'web') {
+            try {
+                // @ts-ignore
+                const solflare = window.solflare;
+                // @ts-ignore
+                const solana = window.solana;
+                if (solflare?.isSolflare) await solflare.disconnect();
+                if (solana?.isPhantom) await solana.disconnect();
+            } catch (e) {
+                console.log("Disconnect error", e);
+            }
+        }
+    };
+
     const connectWallet = async () => {
         if (Platform.OS === 'web') {
             try {
@@ -838,7 +857,7 @@ export default function App() {
             <SafeAreaView style={styles.container}>
                 <StatusBar style="light" />
 
-                {gameState === 'LOBBY' && (
+                {gameState !== 'LOGIN' && (
                     <View style={styles.topBar}>
                         <View style={styles.profileBadgeSmall}>
                             <View style={styles.avatarSmall} />
@@ -847,6 +866,10 @@ export default function App() {
                                 {balance !== null && <Text style={styles.balanceText}>{balance.toFixed(2)} SOL</Text>}
                             </View>
                         </View>
+
+                        <TouchableOpacity style={styles.disconnectBtn} onPress={handleDisconnect}>
+                            <Text style={styles.disconnectBtnText}>DISCONNECT</Text>
+                        </TouchableOpacity>
                     </View>
                 )}
 
@@ -1755,7 +1778,25 @@ const styles = StyleSheet.create({
         position: 'absolute',
         top: 20,
         left: 20,
+        right: 20,
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
         zIndex: 100,
+    },
+    disconnectBtn: {
+        backgroundColor: 'rgba(255, 0, 0, 0.1)',
+        paddingHorizontal: 15,
+        paddingVertical: 8,
+        borderRadius: 15,
+        borderWidth: 1,
+        borderColor: 'rgba(255, 0, 0, 0.5)',
+    },
+    disconnectBtnText: {
+        color: '#ff4d4d',
+        fontWeight: 'bold',
+        fontSize: 10,
+        letterSpacing: 1,
     },
     profileBadgeSmall: {
         flexDirection: 'row',
