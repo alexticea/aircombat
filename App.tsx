@@ -256,14 +256,28 @@ export default function App() {
             }
         };
 
+        const handleOpponentResigned = () => {
+            if (gameStateRef.current === 'PLAY' || gameStateRef.current === 'SETUP') {
+                Alert.alert("Victory!", "Opponent resigned. You win!");
+                setWinner('PLAYER');
+                setGameState('GAME_OVER');
+                setBattleMsg("OPPONENT RESIGNED");
+
+                // Submit score
+                submitScore(username, playerWinsRef.current + 1, totalPlanesDestroyed);
+            }
+        };
+
         socket.on('incoming_fire', handleIncomingFire);
         socket.on('shot_feedback', handleShotFeedback);
         socket.on('opponent_disconnected', handleOpponentDisconnected);
+        socket.on('opponent_resigned', handleOpponentResigned);
 
         return () => {
             socket.off('incoming_fire', handleIncomingFire);
             socket.off('shot_feedback', handleShotFeedback);
             socket.off('opponent_disconnected', handleOpponentDisconnected);
+            socket.off('opponent_resigned', handleOpponentResigned);
         };
     }, [socket, roomId]); // Re-bind when socket/room changes (or grid ref updates implicitly)
 
@@ -552,6 +566,29 @@ export default function App() {
 
         setGameState('SEARCHING');
         socket.emit('join_matchmaking', { username, walletAddress });
+    };
+
+    const handleResign = () => {
+        Alert.alert(
+            "Confirm Resignation",
+            "Are you sure you want to abort the mission? This will count as a defeat.",
+            [
+                { text: "CANCEL", style: "cancel" },
+                {
+                    text: "RESIGN",
+                    style: "destructive",
+                    onPress: () => {
+                        setWinner('COMPUTER');
+                        setGameState('GAME_OVER');
+                        setBattleMsg("MISSION ABORTED");
+
+                        if (isMultiplayer && socket && roomId) {
+                            socket.emit('resign', { roomId });
+                        }
+                    }
+                }
+            ]
+        );
     };
 
     const startGame = () => {
@@ -995,10 +1032,7 @@ export default function App() {
 
                             <TouchableOpacity
                                 style={[styles.button, { backgroundColor: '#333', marginTop: 40, width: 200 }]}
-                                onPress={() => {
-                                    setGameState('LOBBY');
-                                    setIsFleetReady(false);
-                                }}
+                                onPress={handleResign}
                             >
                                 <Text style={styles.buttonText}>RESIGN</Text>
                             </TouchableOpacity>
@@ -1079,6 +1113,14 @@ export default function App() {
                                 ]}>
                                     <Text style={styles.turnText}>{turn === 'PLAYER' ? "YOUR TURN" : "ENEMY ATTACKING..."}</Text>
                                 </Animated.View>
+
+                                <TouchableOpacity
+                                    style={[styles.button, { backgroundColor: '#333', marginTop: 40, width: 160, height: 40 }]}
+                                    onPress={handleResign}
+                                >
+                                    <Text style={[styles.buttonText, { fontSize: 14 }]}>RESIGN</Text>
+                                </TouchableOpacity>
+                                <View style={{ height: 60 }} />
                             </View>
                         </ScrollView>
                     )

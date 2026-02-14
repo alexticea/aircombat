@@ -167,6 +167,11 @@ io.on('connection', (socket) => {
         // For now just relay
     });
 
+    socket.on('resign', ({ roomId }) => {
+        socket.to(roomId).emit('opponent_resigned');
+        delete activeGames[roomId];
+    });
+
     socket.on('play_again', ({ roomId }) => {
         // Simple rematch logic or kick to lobby
         socket.to(roomId).emit('opponent_play_again');
