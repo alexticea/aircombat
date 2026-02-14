@@ -930,8 +930,8 @@ export default function App() {
 
                 {
                     gameState === 'SETUP' && (
-                        <View style={styles.gameContainer}>
-                            <View style={{ alignItems: 'center', marginBottom: 20 }}>
+                        <ScrollView contentContainerStyle={styles.scrollContent}>
+                            <View style={{ alignItems: 'center', marginBottom: 20, paddingTop: 30 }}>
                                 <Text style={styles.header}>PLACE YOUR FLEET ({playerPlanes.length}/3)</Text>
                                 <TouchableOpacity
                                     style={[styles.undoButton, { marginTop: 10, opacity: playerPlanes.length > 0 ? 1 : 0.4 }]}
@@ -994,16 +994,16 @@ export default function App() {
                             )}
 
                             <TouchableOpacity
-                                style={[styles.button, { backgroundColor: '#333', marginTop: 30, width: 140, height: 45 }]}
+                                style={[styles.button, { backgroundColor: '#333', marginTop: 40, width: 200 }]}
                                 onPress={() => {
                                     setGameState('LOBBY');
                                     setIsFleetReady(false);
-                                    // If multiplayer, we might need to notify server, but for now simple return
                                 }}
                             >
-                                <Text style={[styles.buttonText, { fontSize: 14 }]}>RESIGN</Text>
+                                <Text style={styles.buttonText}>RESIGN</Text>
                             </TouchableOpacity>
-                        </View>
+                            <View style={{ height: 40 }} />
+                        </ScrollView>
                     )
                 }
 
