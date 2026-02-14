@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, TouchableOpacity, StyleSheet, Dimensions, Text } from 'react-native';
-import { BOARD_SIZE, GridCell, Coordinate } from '../GameLogic';
+import { BOARD_SIZE, GridCell, Coordinate, Plane } from '../GameLogic';
 
 const { width } = Dimensions.get('window');
 const DEFAULT_CELL_SIZE = ((width - 40) / BOARD_SIZE) * 0.76;
@@ -13,14 +13,15 @@ interface GridProps {
     previewCells?: Coordinate[];
     isValidPreview?: boolean;
     cellSize?: number;
+    planes?: Plane[];
 }
 
-const GridCellComponent = ({ cell, x, y, onPress, active, showPlanes, previewColor, cellSize = DEFAULT_CELL_SIZE }: any) => {
-    // Replaced Animated with plain View for maximum compatibility on experimental devices
+const GridCellComponent = ({ cell, x, y, onPress, active, showPlanes, previewColor, cellSize = DEFAULT_CELL_SIZE, isRevealedPlane }: any) => {
     const isGhost = !!previewColor;
-    const underlyingColor = getCellColor(cell, showPlanes);
-    const borderColor = isGhost ? '#FFFFFF' : '#333';
-    const borderWidth = isGhost ? 1 : 0.5; // Thin white line for ghost
+    const isPlaneCell = (showPlanes && cell.planeId !== undefined) || isRevealedPlane;
+    const underlyingColor = getCellColor(cell, showPlanes || isRevealedPlane);
+    const borderColor = (isGhost || isPlaneCell) ? '#FFFFFF' : '#333';
+    const borderWidth = (isGhost || isPlaneCell) ? 1 : 0.5;
     const scale = cell.state !== 'EMPTY' || isGhost ? 1.05 : 1;
 
     // Ghost tint for validity feedback (very transparent so underlying planes show)
@@ -55,7 +56,7 @@ function getCellColor(cell: GridCell, showPlanes?: boolean) {
     return '#1A1A2E'; // Dark Background
 }
 
-export const Grid: React.FC<GridProps> = ({ grid, onCellPress, active, showPlanes, previewCells, isValidPreview, cellSize }) => {
+export const Grid: React.FC<GridProps> = ({ grid, onCellPress, active, showPlanes, previewCells, isValidPreview, cellSize, planes }) => {
     const letters = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J'];
     const numbers = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10'];
 
@@ -85,6 +86,11 @@ export const Grid: React.FC<GridProps> = ({ grid, onCellPress, active, showPlane
                                         previewColor = isValidPreview ? '#00FF00' : '#FF0000';
                                     }
                                 }
+                                let isRevealedPlane = false;
+                                if (planes && showPlanes) {
+                                    isRevealedPlane = planes.some((p: Plane) => p.cells.some((c: Coordinate) => c.x === x && c.y === y));
+                                }
+
                                 return (
                                     <GridCellComponent
                                         key={`${x}-${y}`}
@@ -96,6 +102,7 @@ export const Grid: React.FC<GridProps> = ({ grid, onCellPress, active, showPlane
                                         showPlanes={showPlanes}
                                         previewColor={previewColor}
                                         cellSize={cellSize}
+                                        isRevealedPlane={isRevealedPlane}
                                     />
                                 );
                             })}

@@ -11,6 +11,7 @@ import * as SolanaLogin from './SolanaLogin';
 import { io, Socket } from 'socket.io-client';
 
 import { PublicKey, Connection, clusterApiUrl, LAMPORTS_PER_SOL } from '@solana/web3.js';
+import * as SkrService from './SkrService';
 
 // Simple Linear Gradient BG placeholder (or use dark solid color)
 const BG_COLOR = '#050510';
@@ -26,6 +27,7 @@ export default function App() {
     const [battleMsg, setBattleMsg] = useState<string | null>(null);
     const [playerScore, setPlayerScore] = useState(0);
     const [computerScore, setComputerScore] = useState(0);
+    const [isAttacking, setIsAttacking] = useState(false);
 
     // Match Stats
     const [pHits, setPHits] = useState(0);
@@ -221,6 +223,7 @@ export default function App() {
 
             if (isKill) {
                 setBattleMsg("WE LOST A PLANE!");
+                setComputerScore(prevS => prevS + 1);
                 const hp = playerPlanesRef.current.find(p => p.id === target.planeId);
                 if (hp) hp.isDestroyed = true;
 
@@ -283,8 +286,10 @@ export default function App() {
                 }
             } else {
                 setBattleMsg("MISS!");
-                setTurn('COMPUTER');
             }
+            // Always pass the turn regardless of hit/miss as per user request
+            setTurn('COMPUTER');
+            setIsAttacking(false);
         };
 
         const handleOpponentDisconnected = () => {
@@ -484,14 +489,21 @@ export default function App() {
                 setUsername(address);
                 setWalletAddress(address);
 
-                // Fetch Balance
+                // Fetch Balance & Resolve Domain
                 (async () => {
                     try {
                         const connection = new Connection(clusterApiUrl('devnet'), 'confirmed');
                         const bal = await connection.getBalance(result.publicKey);
                         setBalance(bal / LAMPORTS_PER_SOL);
+
+                        // Resolve .skr domain
+                        const domain = await SkrService.getSkrDomainFromAddress(address);
+                        if (domain) {
+                            console.log("[App] Resolved Domain:", domain);
+                            setUsername(domain);
+                        }
                     } catch (e) {
-                        console.error("Failed to fetch balance", e);
+                        console.error("Failed to fetch wallet info", e);
                     }
                 })();
 
@@ -568,8 +580,15 @@ export default function App() {
                     const connection = new Connection(clusterApiUrl('devnet'), 'confirmed');
                     const bal = await connection.getBalance(publicKey);
                     setBalance(bal / LAMPORTS_PER_SOL);
+
+                    // Resolve .skr domain on web as well
+                    const domain = await SkrService.getSkrDomainFromAddress(address);
+                    if (domain) {
+                        console.log("[App] Resolved Web Domain:", domain);
+                        setUsername(domain);
+                    }
                 } catch (e) {
-                    console.error("Failed to fetch balance on web", e);
+                    console.error("Failed to fetch info on web", e);
                 }
 
                 setTimeout(() => {
@@ -651,6 +670,7 @@ export default function App() {
         setCMisses(0);
         setShowRecap(false);
         setIsFleetReady(false);
+        setIsAttacking(false);
     };
 
     // Setup Phase
@@ -766,14 +786,15 @@ export default function App() {
 
     // Game Loop
     const handleAttack = (x: number, y: number) => {
-        if (turn !== 'PLAYER' || gameState !== 'PLAY') return;
+        if (turn !== 'PLAYER' || gameState !== 'PLAY' || isAttacking) return;
+
+        // Prevent hitting same spot twice
+        if (computerGrid[y][x].state !== 'EMPTY') return;
+
+        setIsAttacking(true);
 
         if (isMultiplayer && socket && roomId) {
             socket.emit('fire_shot', { roomId, coordinate: { x, y } });
-            // Optimistic update or wait? 
-            // Ideally wait for shot_feedback to know if hit/miss. 
-            // But we can mark as "pending" if we want.
-            // For now, do nothing, just wait for response.
             return;
         }
 
@@ -800,6 +821,7 @@ export default function App() {
             });
             setWinner('PLAYER');
             setPlayerScore(3);
+            setIsAttacking(false);
             setBattleMsg('VICTORY!');
             setTimeout(() => {
                 setGameState('GAME_OVER');
@@ -814,6 +836,7 @@ export default function App() {
             setTimeout(() => {
                 setBattleMsg(null);
                 setTurn('COMPUTER');
+                setIsAttacking(false);
                 setTimeout(computerTurn, 1000);
             }, 1200);
         } else if (result.result === 'KILL') {
@@ -824,6 +847,7 @@ export default function App() {
             setTimeout(() => {
                 setBattleMsg(null);
                 setTurn('COMPUTER');
+                setIsAttacking(false);
                 setTimeout(computerTurn, 1000);
             }, 1500);
         } else {
@@ -832,6 +856,7 @@ export default function App() {
             setTimeout(() => {
                 setBattleMsg(null);
                 setTurn('COMPUTER');
+                setIsAttacking(false);
                 setTimeout(computerTurn, 1000);
             }, 1000);
         }
@@ -899,7 +924,6 @@ export default function App() {
                     setTurn('PLAYER');
                 }, 1000);
             }
-            setTurn('PLAYER');
         }
     };
 
@@ -908,7 +932,7 @@ export default function App() {
             <SafeAreaView style={styles.container}>
                 <StatusBar style="light" />
 
-                {(gameState === 'LOBBY' || gameState === 'SEARCHING') && (
+                {gameState === 'LOBBY' && (
                     <>
                         <View style={styles.topBar}>
                             <View style={styles.profileBadgeSmall}>
@@ -1079,12 +1103,6 @@ export default function App() {
                                 </View>
                             )}
 
-                            <TouchableOpacity
-                                style={[styles.button, { backgroundColor: '#333', marginTop: 40, width: 200 }]}
-                                onPress={handleResign}
-                            >
-                                <Text style={styles.buttonText}>RESIGN</Text>
-                            </TouchableOpacity>
                             <View style={{ height: 40 }} />
                         </ScrollView>
                     )
@@ -1117,13 +1135,13 @@ export default function App() {
 
                             <View style={styles.scoreBoard}>
                                 <Text style={styles.scoreLabel} numberOfLines={1}>
-                                    {username.length > 8 ? `${username.slice(0, 3)}..${username.slice(-2)}` : username}
+                                    {username.length > 14 ? `${username.slice(0, 4)}..${username.slice(-4)}` : username}
                                 </Text>
                                 <Text style={styles.scoreValue}>{playerScore}</Text>
                                 <Text style={styles.scoreVs}> VS </Text>
                                 <Text style={styles.scoreValue}>{computerScore}</Text>
                                 <Text style={styles.scoreLabel} numberOfLines={1}>
-                                    {isMultiplayer ? (opponentName?.length && opponentName.length > 8 ? `${opponentName.slice(0, 3)}..${opponentName.slice(-2)}` : (opponentName || 'ENEMY')) : 'CPU'}
+                                    {isMultiplayer ? (opponentName?.length && opponentName.length > 14 ? `${opponentName.slice(0, 4)}..${opponentName.slice(-4)}` : (opponentName || 'ENEMY')) : 'CPU'}
                                 </Text>
                             </View>
 
@@ -1163,12 +1181,6 @@ export default function App() {
                                     <Text style={styles.turnText}>{turn === 'PLAYER' ? "YOUR TURN" : "ENEMY ATTACKING..."}</Text>
                                 </Animated.View>
 
-                                <TouchableOpacity
-                                    style={[styles.button, { backgroundColor: '#333', marginTop: 40, width: 160, height: 40 }]}
-                                    onPress={handleResign}
-                                >
-                                    <Text style={[styles.buttonText, { fontSize: 14 }]}>RESIGN</Text>
-                                </TouchableOpacity>
                                 <View style={{ height: 60 }} />
                             </View>
                         </ScrollView>
@@ -1207,6 +1219,7 @@ export default function App() {
                                             onCellPress={() => { }}
                                             showPlanes={true}
                                             cellSize={CELL_SIZE}
+                                            planes={computerPlanes}
                                         />
                                     </View>
 
@@ -1256,6 +1269,7 @@ export default function App() {
                                             onCellPress={() => { }}
                                             showPlanes={true}
                                             cellSize={CELL_SIZE}
+                                            planes={playerPlanes}
                                         />
                                     </View>
 
@@ -1620,28 +1634,32 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        marginVertical: 10,
+        marginVertical: 12,
         backgroundColor: '#1E1E2E',
-        borderRadius: 30,
+        borderRadius: 28,
         paddingHorizontal: 20,
-        paddingVertical: 5,
-        borderWidth: 1,
-        borderColor: '#333',
+        paddingVertical: 10,
+        borderWidth: 1.5,
+        borderColor: '#444',
+        alignSelf: 'center',
+        minWidth: '60%',
     },
     scoreLabel: {
         color: '#aaa',
-        fontSize: 12,
+        fontSize: 11,
         fontWeight: 'bold',
+        marginHorizontal: 8,
     },
     scoreValue: {
         color: '#fff',
-        fontSize: 20,
+        fontSize: 21,
         fontWeight: '900',
     },
     scoreVs: {
         color: '#6C5CE7',
-        fontSize: 14,
+        fontSize: 13,
         fontWeight: '900',
+        marginHorizontal: 4,
     },
     // Lobby Styles
     profileBadge: {
