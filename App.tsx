@@ -858,7 +858,7 @@ export default function App() {
             <SafeAreaView style={styles.container}>
                 <StatusBar style="light" />
 
-                {gameState !== 'LOGIN' && (
+                {gameState === 'LOBBY' && (
                     <View style={styles.topBar}>
                         <View style={styles.profileBadgeSmall}>
                             <View style={styles.avatarSmall} />
