@@ -6,7 +6,6 @@ import 'react-native-get-random-values';
 import { Buffer } from '@craftzdog/react-native-buffer';
 global.Buffer = Buffer;
 global.TextEncoder = require('text-encoding').TextEncoder;
-global.TextDecoder = require('text-encoding').TextDecoder;
 global.process = require('process');
 
 import { registerRootComponent } from 'expo';

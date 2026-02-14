@@ -419,12 +419,11 @@ export default function App() {
         }
     }, [gameState]);
 
+    // Handle Deep Links
     useEffect(() => {
         const handleUrl = (url: string | null) => {
             if (!url) return;
             console.log("[App] Deep link received:", url);
-
-            // 1. Handle Connect Callback
             const result = SolanaLogin.handleConnectCallback(url);
             if (result) {
                 const address = result.publicKey.toBase58();
@@ -443,37 +442,7 @@ export default function App() {
                     }
                 })();
 
-                // Now automatically trigger Sign Message for "Login" verification
-                const signRedirect = Linking.createURL('solflare-sign');
-                console.log("[App] Preparing SignMessage redirect:", signRedirect);
-                try {
-                    const signUrl = SolanaLogin.buildSignMessageUrl("Welcome to Air Combat! Sign to authenticate.", signRedirect);
-                    console.log("[App] Opening SignMessage URL in Solflare...");
-
-                    // Alert user so they know why Solflare is opening again
-                    Alert.alert("Verification Required", "Please sign the welcome message in Solflare to verify your pilot identity.", [
-                        {
-                            text: "PROCEED",
-                            onPress: () => {
-                                setTimeout(() => {
-                                    Linking.openURL(signUrl).catch(err => console.error("[App] Linking error:", err));
-                                }, 500);
-                            }
-                        }
-                    ]);
-                } catch (e) {
-                    console.error("Failed to build sign URL", e);
-                    Alert.alert("Notice", "Connected to Solflare. Automated sign-in failed.");
-                    setGameState('LOBBY');
-                    fetchLeaderboard();
-                }
-            }
-
-            // 2. Handle Sign Message Callback
-            const signResult = SolanaLogin.handleSignMessageCallback(url);
-            if (signResult) {
-                console.log("[App] Signature verified:", signResult.signature);
-                Alert.alert("Pilot Verified", "Authentication successful.");
+                Alert.alert("Success", "Connected to Solflare!");
                 setGameState('LOBBY');
                 fetchLeaderboard();
             }
@@ -500,23 +469,18 @@ export default function App() {
         }
     };
 
-    const handleDisconnect = async () => {
+    const disconnect = () => {
         setWalletAddress(null);
-        setBalance(null);
         setGameState('LOGIN');
-        SolanaLogin.clearSession();
-        // If web, disconnect from provider
-        if (Platform.OS === 'web') {
-            try {
-                // @ts-ignore
-                const solflare = window.solflare;
-                // @ts-ignore
-                const solana = window.solana;
-                if (solflare?.isSolflare) await solflare.disconnect();
-                if (solana?.isPhantom) await solana.disconnect();
-            } catch (e) {
-                console.log("Disconnect error", e);
-            }
+        setBalance(null);
+        if (socket) {
+            socket.disconnect();
+            // Reconnect logic usually handled by useEffect [] if needed, 
+            // but for logout we might want a fresh socket or just wait for next login.
+            setSocket(null);
+            // Re-init socket for next potential guest login or wallet login
+            const newSocket = io(API_URL, { transports: ['websocket'] });
+            setSocket(newSocket);
         }
     };
 
@@ -543,17 +507,6 @@ export default function App() {
                 await provider.connect();
                 const publicKey = provider.publicKey;
                 const address = publicKey.toString();
-
-                // Sign welcome message
-                try {
-                    const message = "Welcome to Air Combat! Sign to authenticate.";
-                    const encodedMessage = new TextEncoder().encode(message);
-                    await provider.signMessage(encodedMessage, "utf8");
-                    console.log("[Web] Message signed");
-                } catch (signErr) {
-                    console.warn("[Web] Signature rejected", signErr);
-                    // We'll allow them in for now but in prod we might block
-                }
 
                 setUsername(address);
                 setWalletAddress(address);
@@ -869,20 +822,23 @@ export default function App() {
             <SafeAreaView style={styles.container}>
                 <StatusBar style="light" />
 
-                {gameState === 'LOBBY' && (
-                    <View style={styles.topBar}>
-                        <View style={styles.profileBadgeSmall}>
-                            <View style={styles.avatarSmall} />
-                            <View>
-                                <Text style={styles.profileNameSmall}>{username.length > 20 ? `${username.slice(0, 4)}...${username.slice(-4)}` : username}</Text>
-                                {balance !== null && <Text style={styles.balanceText}>{balance.toFixed(2)} SOL</Text>}
+                {gameState !== 'LOGIN' && (
+                    <>
+                        <View style={styles.topBar}>
+                            <View style={styles.profileBadgeSmall}>
+                                <View style={styles.avatarSmall} />
+                                <View>
+                                    <Text style={styles.profileNameSmall}>{username.length > 20 ? `${username.slice(0, 4)}...${username.slice(-4)}` : username}</Text>
+                                    {balance !== null && <Text style={styles.balanceText}>{balance.toFixed(2)} SOL</Text>}
+                                </View>
                             </View>
                         </View>
-
-                        <TouchableOpacity style={styles.disconnectBtn} onPress={handleDisconnect}>
-                            <Text style={styles.disconnectBtnText}>DISCONNECT</Text>
+                        <TouchableOpacity style={styles.topBarRight} onPress={disconnect}>
+                            <View style={styles.disconnectBadge}>
+                                <Text style={styles.disconnectText}>✕ DISCONNECT</Text>
+                            </View>
                         </TouchableOpacity>
-                    </View>
+                    </>
                 )}
 
                 {gameState === 'LOGIN' && (
@@ -1586,6 +1542,7 @@ const styles = StyleSheet.create({
     profileBadge: {
         alignItems: 'center',
         marginBottom: 30,
+        marginTop: '5%',
         backgroundColor: '#1E1E2E',
         padding: 20,
         borderRadius: 20,
@@ -1788,27 +1745,28 @@ const styles = StyleSheet.create({
     },
     topBar: {
         position: 'absolute',
-        top: '5%',
+        top: '7%',
         left: 20,
-        right: 20,
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
         zIndex: 100,
     },
-    disconnectBtn: {
-        backgroundColor: 'rgba(255, 0, 0, 0.1)',
-        paddingHorizontal: 15,
-        paddingVertical: 8,
-        borderRadius: 15,
-        borderWidth: 1,
-        borderColor: 'rgba(255, 0, 0, 0.5)',
+    topBarRight: {
+        position: 'absolute',
+        top: '7%',
+        right: 20,
+        zIndex: 100,
     },
-    disconnectBtnText: {
-        color: '#ff4d4d',
-        fontWeight: 'bold',
+    disconnectBadge: {
+        backgroundColor: 'rgba(244, 67, 54, 0.9)',
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+        borderRadius: 20,
+        borderWidth: 1,
+        borderColor: '#ffcdd2',
+    },
+    disconnectText: {
+        color: '#fff',
         fontSize: 10,
-        letterSpacing: 1,
+        fontWeight: 'bold',
     },
     profileBadgeSmall: {
         flexDirection: 'row',

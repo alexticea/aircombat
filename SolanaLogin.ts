@@ -16,20 +16,15 @@ export interface PhantomSession {
 // For simplicity in this example, we re-generate keys on app restart or keep in global state
 let sessionState: PhantomSession | null = null;
 
+// Generate a new DApp Keypair on init
 export const initSession = (): PhantomSession => {
     const keyPair = nacl.box.keyPair();
     sessionState = { dappKeyPair: keyPair };
-    console.log("[SolanaLogin] Session initialized with new keypair");
     return sessionState;
 };
 
-export const clearSession = () => {
-    sessionState = null;
-    console.log("[SolanaLogin] Session cleared");
-};
-
 // Helper to encrypt payload
-export const encryptPayload = (payload: any, sharedSecret: Uint8Array) => {
+const encryptPayload = (payload: any, sharedSecret: Uint8Array) => {
     const nonce = nacl.randomBytes(24);
     const payloadJson = JSON.stringify(payload);
     const payloadBytes = new TextEncoder().encode(payloadJson);
@@ -48,8 +43,7 @@ const decryptPayload = (data: string, nonce: string, sharedSecret: Uint8Array) =
 
 
 export const buildConnectUrl = (redirectLink: string) => {
-    // Always start fresh on a new connect attempt to avoid state confusion
-    initSession();
+    if (!sessionState) initSession();
     const { dappKeyPair } = sessionState!;
 
     const params = new URLSearchParams({
@@ -66,17 +60,14 @@ export const handleConnectCallback = (url: string): { publicKey: PublicKey, sess
     if (!sessionState) return null;
 
     const parsed = Linking.parse(url);
-    console.log("[SolanaLogin] Parsed path:", parsed.path);
-    // Explicitly check path to avoid cross-fire with signMessage callback
-    if (parsed.path !== 'solflare-login') return null;
-
     const queryParams = parsed.queryParams;
-    console.log("[SolanaLogin] Connect Callback:", url);
+    console.log("[SolanaLogin] Deep Link URL:", url);
+    console.log("[SolanaLogin] Query Params:", JSON.stringify(queryParams));
 
     if (!queryParams) return null;
 
     if (queryParams.errorCode) {
-        console.error("[SolanaLogin] Connection Error:", queryParams.errorMessage);
+        console.error("[SolanaLogin] Error:", queryParams.errorMessage);
         return null;
     }
 
@@ -112,63 +103,6 @@ export const handleConnectCallback = (url: string): { publicKey: PublicKey, sess
             }
         } catch (e) {
             console.error("Error handling connect callback", e);
-        }
-    }
-    return null;
-};
-
-export const buildSignMessageUrl = (message: string, redirectLink: string) => {
-    if (!sessionState || !sessionState.sharedSecret || !sessionState.session) {
-        throw new Error("No active session. Connect first.");
-    }
-
-    const payload = {
-        session: sessionState.session,
-        message: bs58.encode(new TextEncoder().encode(message)),
-    };
-
-    const [nonce, encryptedPayload] = encryptPayload(payload, sessionState.sharedSecret);
-
-    const params = new URLSearchParams({
-        dapp_encryption_public_key: bs58.encode(sessionState.dappKeyPair.publicKey),
-        nonce: bs58.encode(nonce),
-        payload: bs58.encode(encryptedPayload),
-        redirect_link: redirectLink,
-    });
-
-    return `https://solflare.com/ul/v1/signMessage?${params.toString()}`;
-};
-
-export const handleSignMessageCallback = (url: string): { signature: string } | null => {
-    if (!sessionState || !sessionState.sharedSecret) return null;
-
-    const parsed = Linking.parse(url);
-    console.log("[SolanaLogin] Sign path:", parsed.path);
-    if (parsed.path !== 'solflare-sign') return null;
-
-    const queryParams = parsed.queryParams;
-    console.log("[SolanaLogin] SignMessage Callback:", url);
-
-    if (!queryParams || queryParams.errorCode) {
-        if (queryParams?.errorCode) console.error("[SolanaLogin] Sign Error:", queryParams.errorMessage);
-        return null;
-    }
-
-    const dataStr = queryParams.data as string;
-    const nonceStr = queryParams.nonce as string;
-
-    if (dataStr && nonceStr) {
-        try {
-            const dataBytes = bs58.decode(dataStr);
-            const nonceBytes = bs58.decode(nonceStr);
-
-            const decryptedBox = nacl.box.open.after(dataBytes, nonceBytes, sessionState.sharedSecret);
-            if (!decryptedBox) return null;
-
-            const decryptedPayload = JSON.parse(new TextDecoder().decode(decryptedBox));
-            return { signature: decryptedPayload.signature };
-        } catch (e) {
-            console.error("Error handling signMessage callback", e);
         }
     }
     return null;
