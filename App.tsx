@@ -11,6 +11,8 @@ import { Coordinate, GridCell, Plane } from './GameLogic';
 import { transact, Web3MobileWallet } from '@solana-mobile/mobile-wallet-adapter-protocol-web3js';
 import { PublicKey, Connection, clusterApiUrl, LAMPORTS_PER_SOL } from '@solana/web3.js';
 
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
 // Simple Linear Gradient BG placeholder (or use dark solid color)
 const BG_COLOR = '#050510';
 const APP_IDENTITY = {
@@ -268,12 +270,30 @@ export default function App() {
 
         try {
             const { address, publicKey } = await transact(async (wallet: Web3MobileWallet) => {
-                const { accounts, auth_token } = await wallet.authorize({
-                    cluster: 'devnet',
-                    identity: APP_IDENTITY,
-                });
+                let authToken = await AsyncStorage.getItem('solana_auth_token');
+                let authorizationResult;
 
-                const firstAccount = accounts[0];
+                try {
+                    if (authToken) {
+                        authorizationResult = await wallet.reauthorize({
+                            auth_token: authToken,
+                            identity: APP_IDENTITY,
+                        });
+                    } else {
+                        throw new Error('No token');
+                    }
+                } catch (e) {
+                    authorizationResult = await wallet.authorize({
+                        cluster: 'devnet',
+                        identity: APP_IDENTITY,
+                    });
+                }
+
+                if (authorizationResult.auth_token) {
+                    await AsyncStorage.setItem('solana_auth_token', authorizationResult.auth_token);
+                }
+
+                const firstAccount = authorizationResult.accounts[0];
                 const key = new PublicKey(firstAccount.address);
                 const addr = key.toBase58();
 
